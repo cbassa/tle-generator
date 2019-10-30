@@ -12,6 +12,9 @@ if __name__ == "__main__":
     for newline in newlines:
         # Check if this is an IOD observation
         if is_iod_observation(newline):
+            # Clean line
+            newline = newline.replace("\xa0", " ")
+            
             # Decode IOD observation
             o = decode_iod_observation(newline)
 

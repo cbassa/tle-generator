@@ -116,42 +116,58 @@ def decode_iod_observation(iod_line):
 
     if epoch!=5:
         print("Epoch not implemented!")
-    
+
     # Decode angle
+    p = None
     angle1 = iod_line[47:54]
     angle2 = iod_line[54:61]
     if angle_format==1:
         # Format 1: RA/DEC = HHMMSSs+DDMMSS MX   (MX in seconds of arc)
-        ra = decode_HHMMSSs(angle1)
-        dec = decode_DDMMSS(angle2)
-        p = SkyCoord(ra=ra, dec=dec, frame=FK5)
+        try:
+            ra = decode_HHMMSSs(angle1)
+            dec = decode_DDMMSS(angle2)
+            p = SkyCoord(ra=ra, dec=dec, frame=FK5)
+        except:
+            p = None
     elif angle_format==2:
         # Format 2: RA/DEC = HHMMmmm+DDMMmm MX   (MX in minutes of arc)
-        ra = decode_HHMMmmm(angle1)
-        dec = decode_DDMMmm(angle2)
-        p = SkyCoord(ra=ra, dec=dec, frame=FK5)
+        try:
+            ra = decode_HHMMmmm(angle1)
+            dec = decode_DDMMmm(angle2)
+            p = SkyCoord(ra=ra, dec=dec, frame=FK5)
+        except:
+            p = None
     elif angle_format==3:
         # Format 3: RA/DEC = HHMMmmm+DDdddd MX   (MX in degrees of arc)
-        ra = decode_HHMMmmm(angle1)
-        dec = decode_DDdddd(angle2)
-        p = SkyCoord(ra=ra, dec=dec, frame=FK5)
+        try:
+            ra = decode_HHMMmmm(angle1)
+            dec = decode_DDdddd(angle2)
+            p = SkyCoord(ra=ra, dec=dec, frame=FK5)
+        except:
+            p = None
     elif angle_format==4:
         # Format 4: AZ/EL  = DDDMMSS+DDMMSS MX   (MX in seconds of arc)
         az = decode_DDDMMSS(angle1)
         alt = decode_DDMMSS(angle2)
+        p = None
     elif angle_format==5:
         # Format 5: AZ/EL  = DDDMMmm+DDMMmm MX   (MX in minutes of arc)
-        az = decode_DDMMmmm(angle1)
+        az = decode_DDMMmm(angle1)
         alt = decode_DDMMmm(angle2)
+        p = None
     elif angle_format==6:
         # Format 6: AZ/EL  = DDDdddd+DDdddd MX   (MX in degrees of arc)
         az = decode_DDDdddd(angle1)
         alt = decode_DDdddd(angle2)
+        p = None
     elif angle_format==7:
         # Format 7: RA/DEC = HHMMSSs+DDdddd MX   (MX in degrees of arc)
-        ra = decode_HHMMSSs(angle1)
-        dec = decode_DDdddd(angle2)
-        p = SkyCoord(ra=ra, dec=dec, frame=FK5)
+        try:
+            ra = decode_HHMMSSs(angle1)
+            dec = decode_DDdddd(angle2)
+            p = SkyCoord(ra=ra, dec=dec, frame=FK5)
+        except:
+            p = None
     else:
         print("Format not defined")
 
