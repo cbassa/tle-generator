@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import re
 from astropy.time import Time
 from astropy.coordinates import Angle, SkyCoord, FK4, FK5, ICRS
 import astropy.units as u
@@ -20,6 +21,14 @@ class Observation:
         self.epoch = epoch
         self.iod_line = iod_line
 
+def is_iod_observation(line):
+    iod_pattern = r"\d{5} \d{2} \d{3}... \d{4} . \d{17} \d{2} \d{2} \d{7}.\d{6} \d{2}"
+
+    if re.match(iod_pattern, line) is not None:
+        return True
+    else:
+        return False
+        
 def insert_into_string(s, i, c):
     """Insert character c into string s at index i"""
 
@@ -93,7 +102,10 @@ def decode_iod_observation(iod_line):
     timestamp = insert_into_string(timestamp, 8, "T")
     timestamp = insert_into_string(timestamp, 6, "-")
     timestamp = insert_into_string(timestamp, 4, "-")
-    t = Time(timestamp, format="isot", scale="utc")
+    try:
+        t = Time(timestamp, format="isot", scale="utc")
+    except ValueError:
+        t = None
 
     # Decode time uncertainty
     me, xe = int(iod_line[41]), int(iod_line[42])
