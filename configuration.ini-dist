@@ -1,0 +1,2 @@
+[Common]
+observations_path = /path/to/observations/ # Path to store imported observations
