@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 import numpy as np
 from astropy.time import Time
 from astropy.coordinates import Angle, SkyCoord, FK4, FK5, ICRS
@@ -24,7 +25,7 @@ class two_line_element:
             self.name = self.tle0.strip()
         self.id = self.tle1.split(" ")[1][:5]
 
-def plot():
+def plot(observations):
     t = Time([o.t.mjd for o in observations], format="mjd")
     y = np.zeros_like(t)
     s = np.array([o.site_id for o in observations])
@@ -48,16 +49,14 @@ def plot():
 
     
     plt.tight_layout()
-    plt.savefig("plot.png")
+    plt.show()
 
-def residuals():
+# def residuals(location, tle_lines, t):
     # Set observer
     observer = ephem.Observer()
-    observer.lon = "6.3785"
-    observer.lat = "52.8344"
-    observer.elevation = 10
-
-    tle_lines = ["OBJ", "1 31701U 07027A   19132.86965740  .00000000  00000-0  50000-4 0    01", "2 31701  63.5301 110.4000 0001000   0.0000  91.0111 13.55100810    06"]
+    observer.lon = str(location['lon'])
+    observer.lat = str(location['lat'])
+    observer.elevation = location['elevation']
 
     tle = two_line_element(tle_lines[0], tle_lines[1], tle_lines[2])
 
@@ -72,32 +71,53 @@ def residuals():
     psat = SkyCoord(ra=float(satellite.ra), dec=float(satellite.dec), unit="rad", frame="fk5", equinox=t).transform_to(FK5(equinox="J2000"))
 
     print(psat)
-    print(psat.separation(pobs))
+    # print(psat.separation(pobs))
 
     
         
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Read an observations file and plot the brightness vs time.')
+    parser.add_argument('OBSERVATION_FILE', type=str,
+                        help='File with observations in IOD format')
+
+    args = parser.parse_args()
+
     # Open file
-    fp = open("37386.dat", "r")
+    fp = open(args.OBSERVATION_FILE, "r")
     lines = fp.readlines()
     fp.close()
 
     # Decode observations
     observations = [decode_iod_observation(line) for line in lines]
 
-    t = Time([o.t.mjd for o in observations], format="mjd")
-    tmin, tmax = np.min(t), np.max(t)
+    plot(observations)
 
-    dt = 15.0
-    
-    for i, mjd0 in enumerate(np.arange(np.floor(tmin.mjd)+dt, np.floor(tmax.mjd))):
-        c = (t.mjd>mjd0-dt) & (t.mjd<=mjd0)
-        print(mjd0, np.sum(c))
+    # TODO: Remove hard-coded values here!
+    # location = {'lon':"6.3785",
+    #             'lat':"52.8344",
+    #             'elevation': 10}
 
-        fp = open("p%04d.dat"%i, "w")
-        for j, o in enumerate(observations):
-            if c[j]:
-                fp.write(o.iod_line)
+    # tle = ["OBJ",
+    #        "1 31701U 07027A   19132.86965740  .00000000  00000-0  50000-4 0    01",
+    #        "2 31701  63.5301 110.4000 0001000   0.0000  91.0111 13.55100810    06"]
 
-        fp.close()
-        
+
+    # t = Time([o.t.mjd for o in observations], format="mjd")
+    # residuals(location, tle, t[0])
+    # tmin, tmax = np.min(t), np.max(t)
+
+    # dt = 15.0
+
+    # print(t)
+    # print(tmin, tmax)
+    # print(list(enumerate(np.arange(np.floor(tmin.mjd)+dt, np.floor(tmax.mjd)))))
+    # for i, mjd0 in enumerate(np.arange(np.floor(tmin.mjd)+dt, np.floor(tmax.mjd))):
+    #     c = (t.mjd>mjd0-dt) & (t.mjd<=mjd0)
+    #     print(mjd0, np.sum(c))
+
+    #     fp = open("p%04d.dat"%i, "w")
+    #     for j, o in enumerate(observations):
+    #         if c[j]:
+    #             fp.write(o.iod_line)
+
+    #     fp.close()
