@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
-import os
+
+import argparse
+import configparser
+from pathlib import Path
+
 from tlegenerator.iod import is_iod_observation, decode_iod_observation
 
-if __name__ == "__main__":
-    # Open file
-    fp = open("temp.dat", errors="replace")
-    newlines = fp.readlines()
-    fp.close()
+
+def ingest_observations(observations_path, newlines):
+    '''
+    Reads a list of IOD observation strings and writes them into the common file structure.
+    '''
 
     # Check if IOD
     for newline in newlines:
@@ -17,27 +21,37 @@ if __name__ == "__main__":
             
             # Decode IOD observation
             o = decode_iod_observation(newline)
-
-            # Generate directory
-            if not os.path.exists("observations"):
-                os.makedirs("observations")
             
             # Data file name
-            fname = os.path.join("observations", "%05d.dat" % o.satno)
+            fname = Path(observations_path, f"{o.satno:05d}.dat")
 
             # Read existing observations
             oldlines = []
-            if os.path.exists(fname):
-                with open(fname, "r") as fp:
-                    oldlines = fp.readlines()
+            if fname.exists():
+                with open(fname, "r") as f:
+                    oldlines = f.readlines()
+                    # NOTE: This might take a considerable amount of RAM
+                    # if there are many obs as it reads all previous observations.
 
             # Append if no duplicate
             if not newline in oldlines:
                 oldlines.append(newline)
                 
             # Lines to write
-            fp = open(fname, "w")
-            for line in oldlines:
-                fp.write("%s" % line)
-            fp.close()
-                    
+            with open(fname, "w") as f:
+                for line in oldlines:
+                    f.write("%s" % line)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Import observations file into the common file structure.')
+    parser.add_argument('OBSERVATIONS_FILE', type=str,
+                        help='File with observations in IOD format')
+    args = parser.parse_args()
+
+    cfg = configparser.ConfigParser(inline_comment_prefixes=('#', ';'))
+    cfg.read('configuration.ini')
+
+    with open(args.OBSERVATIONS_FILE, errors="replace") as f:
+        newlines = f.readlines()
+        ingest_observations(cfg.get('Common', 'observations_path'), newlines)
