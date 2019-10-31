@@ -38,3 +38,8 @@ Consider using a VirtualEnv to run stvid on a separate python virtual environmen
   ```
   ./ingest.py examples/obs_20190507.dat
   ```
+
+## License
+&copy; 2019 Cees Bassa
+
+Licensed under the [GPLv3 or later](LICENSE).
