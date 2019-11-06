@@ -1,6 +1,6 @@
 # tle-generator
 
-This is a set of *python* programs to generate two-line elements from (visual) observations.
+This is a set of python tools to generate two-line elements (TLEs) from (visual) observations.
 
 ## Background
 
@@ -10,7 +10,7 @@ and create new TLEs or refine already existing TLEs using this data.
 
 ## Installation
 
-stvid handles dependencies using pip. You can install requirements by running:
+`tle-generator` handles dependencies using `pip`. You can install requirements by running:
 ```
 pip install -r requirements.txt
 ```
