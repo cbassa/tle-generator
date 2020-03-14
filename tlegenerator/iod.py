@@ -222,7 +222,7 @@ def decode_iod_observation(iod_line, observers):
             logging.debug("Format not defined")
             return None
 
-    # Discard observations with artnings
+    # Discard observations with warnings
     if len(w)>0:
         logging.debug(str(w[-1].message))
         return None
@@ -231,11 +231,17 @@ def decode_iod_observation(iod_line, observers):
     sp = 0.0
     
     # Find observer
+    found = False
     for observer in observers:
         if observer.site_id == site_id:
+            found = True
             break
-    # TODO: Deal with absent observers
-        
+
+    # Discard observations with missing site information
+    if not found:
+        logging.debug(f"Site information missing for {site_id}")
+        return None
+    
     # Format observation
     o = Observation(satno, desig_year, desig_id, site_id, obs_condition, t, st, p, sp, angle_format, epoch, iod_line, observer)
         

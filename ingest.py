@@ -23,8 +23,6 @@ def ingest_observations(observations_path, newlines, observers):
             # Decode IOD observation
             o = decode_iod_observation(newline, observers)
 
-            print(o.t.isot, o.observer.lat, o.observer.lon)
-            
             # Skip bad observations
             if o is None:
                 logger.debug("Discarding %s" % newline.rstrip())
