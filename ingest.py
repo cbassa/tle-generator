@@ -5,10 +5,10 @@ import logging
 import configparser
 from pathlib import Path
 
-from tlegenerator.iod import is_iod_observation, decode_iod_observation
+from tlegenerator.iod import is_iod_observation, decode_iod_observation, read_observers
 
 
-def ingest_observations(observations_path, newlines):
+def ingest_observations(observations_path, newlines, observers):
     '''
     Reads a list of IOD observation strings and writes them into the common file structure.
     '''
@@ -21,8 +21,10 @@ def ingest_observations(observations_path, newlines):
             newline = newline.replace("\xa0", " ")
             
             # Decode IOD observation
-            o = decode_iod_observation(newline)
+            o = decode_iod_observation(newline, observers)
 
+            print(o.t.isot, o.observer.lat, o.observer.lon)
+            
             # Skip bad observations
             if o is None:
                 logger.debug("Discarding %s" % newline.rstrip())
@@ -78,7 +80,12 @@ if __name__ == "__main__":
 
     logger.info("Using config: %s" % conf_file)
 
+    # Read observers
+    logger.info("Reading observers from %s" % cfg.get('Common', 'observers_file'))
+    observers = read_observers(cfg.get('Common', 'observers_file'))
+
+    # Parse observations
     logger.info("Parsing %s" % args.OBSERVATIONS_FILE)
     with open(args.OBSERVATIONS_FILE, errors="replace") as f:
         newlines = f.readlines()
-        ingest_observations(cfg.get('Common', 'observations_path'), newlines)
+        ingest_observations(cfg.get('Common', 'observations_path'), newlines, observers)

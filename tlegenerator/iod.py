@@ -9,7 +9,7 @@ import astropy.units as u
 class Observation:
     """Observation class"""
 
-    def __init__(self, satno, desig_year, desig_id, site_id, obs_condition, t, st, p, sp, angle_format, epoch, iod_line):
+    def __init__(self, satno, desig_year, desig_id, site_id, obs_condition, t, st, p, sp, angle_format, epoch, iod_line, observer):
         self.satno = satno
         self.desig_year = desig_year
         self.desig_id = desig_id
@@ -22,7 +22,42 @@ class Observation:
         self.angle_format = angle_format
         self.epoch = epoch
         self.iod_line = iod_line
+        self.observer = observer
 
+class Observer:
+    """Observer class"""
+
+    def __init__(self, site_id, lat, lon, elev, name):
+        self.site_id = site_id
+        self.lat = lat
+        self.lon = lon
+        self.elev = elev
+        self.name = name
+
+def decode_observer(line):
+    site_id = int(line[0:4])
+    lat = float(line[8:17])
+    lon = float(line[18:27])
+    elev = float(line[28:34])
+    name = line[38:].rstrip()
+
+    return Observer(site_id, lat, lon, elev, name)
+
+        
+def read_observers(fname):
+    observers = []
+    with open(fname, "r") as fp:
+        lines = fp.readlines()
+
+        for line in lines:
+            if "#" in line:
+                continue
+
+            observers.append(decode_observer(line))
+
+    return observers
+            
+        
 def is_iod_observation(line):
     iod_pattern = r"\d{5} \d{2} \d{3}... \d{4} . \d{17} \d{2} \d{2} \d{7}.\d{6} \d{2}"
 
@@ -83,7 +118,7 @@ def decode_DDdddd(s):
     s = insert_into_string(s, 3, ".")
     return Angle(s)
 
-def decode_iod_observation(iod_line):
+def decode_iod_observation(iod_line, observers):
     # NORAD catalog ID
     satno = int(iod_line[0:5])
 
@@ -192,8 +227,16 @@ def decode_iod_observation(iod_line):
         logging.debug(str(w[-1].message))
         return None
 
-    # Format observation
+    # Parse positional error
     sp = 0.0
-    o = Observation(satno, desig_year, desig_id, site_id, obs_condition, t, st, p, sp, angle_format, epoch, iod_line)
+    
+    # Find observer
+    for observer in observers:
+        if observer.site_id == site_id:
+            break
+    # TODO: Deal with absent observers
+        
+    # Format observation
+    o = Observation(satno, desig_year, desig_id, site_id, obs_condition, t, st, p, sp, angle_format, epoch, iod_line, observer)
         
     return o
