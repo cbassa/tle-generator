@@ -21,9 +21,12 @@ class Observation:
         self.sp = sp
         self.angle_format = angle_format
         self.epoch = epoch
-        self.iod_line = iod_line
+        self.iod_line = iod_line.rstrip()
         self.observer = observer
 
+    def __repr__(self):
+        return self.iod_line
+        
 class Observer:
     """Observer class"""
 
@@ -33,6 +36,9 @@ class Observer:
         self.lon = lon
         self.elev = elev
         self.name = name
+
+    def __repr__(self):
+        return f"{self.site_id} {self.lat} {self.lon} {self.elev} {self.name}"
 
 def decode_observer(line):
     site_id = int(line[0:4])
@@ -150,7 +156,7 @@ def decode_iod_observation(iod_line, observers):
 
         # Decode time uncertainty
         me, xe = int(iod_line[41]), int(iod_line[42])
-        st = me*10.0**(xe-8)
+        st = me*10.0**(xe - 8)
 
         # Decode angle format and epoch
         angle_format, epoch = int(iod_line[44]), int(iod_line[45])
@@ -160,11 +166,15 @@ def decode_iod_observation(iod_line, observers):
             logging.debug("Epoch not implemented")
             return None
 
+        # Parse positional error
+        me, xe = int(iod_line[62]), int(iod_line[63])
+        sp = me * 10**(xe - 8)
+        
         # Decode angles
         p = None
         angle1 = iod_line[47:54]
         angle2 = iod_line[54:61]
-        if angle_format==1:
+        if angle_format == 1:
             # Format 1: RA/DEC = HHMMSSs+DDMMSS MX   (MX in seconds of arc)
             try:
                 ra = decode_HHMMSSs(angle1)
@@ -173,7 +183,8 @@ def decode_iod_observation(iod_line, observers):
             except:
                 logging.debug("Failed to decode position")
                 p = None
-        elif angle_format==2:
+            sp = sp / 3600
+        elif angle_format == 2:
             # Format 2: RA/DEC = HHMMmmm+DDMMmm MX   (MX in minutes of arc)
             try:
                 ra = decode_HHMMmmm(angle1)
@@ -182,7 +193,8 @@ def decode_iod_observation(iod_line, observers):
             except:
                 logging.debug("Failed to decode position")
                 p = None
-        elif angle_format==3:
+            sp = sp / 60
+        elif angle_format == 3:
             # Format 3: RA/DEC = HHMMmmm+DDdddd MX   (MX in degrees of arc)
             try:
                 ra = decode_HHMMmmm(angle1)
@@ -191,25 +203,27 @@ def decode_iod_observation(iod_line, observers):
             except:
                 logging.debug("Failed to decode position")
                 p = None
-        elif angle_format==4:
+        elif angle_format == 4:
             logging.debug("Format not implemented")
             # Format 4: AZ/EL  = DDDMMSS+DDMMSS MX   (MX in seconds of arc)
             az = decode_DDDMMSS(angle1)
             alt = decode_DDMMSS(angle2)
             p = None
-        elif angle_format==5:
+            sp = sp / 3600
+        elif angle_format == 5:
             logging.debug("Format not implemented")
             # Format 5: AZ/EL  = DDDMMmm+DDMMmm MX   (MX in minutes of arc)
             az = decode_DDMMmm(angle1)
             alt = decode_DDMMmm(angle2)
             p = None
-        elif angle_format==6:
+            sp = sp / 60
+        elif angle_format == 6:
             logging.debug("Format not implemented")
             # Format 6: AZ/EL  = DDDdddd+DDdddd MX   (MX in degrees of arc)
             az = decode_DDDdddd(angle1)
             alt = decode_DDdddd(angle2)
             p = None
-        elif angle_format==7:
+        elif angle_format == 7:
             # Format 7: RA/DEC = HHMMSSs+DDdddd MX   (MX in degrees of arc)
             try:
                 ra = decode_HHMMSSs(angle1)
@@ -227,9 +241,6 @@ def decode_iod_observation(iod_line, observers):
         logging.debug(str(w[-1].message))
         return None
 
-    # Parse positional error
-    sp = 0.0
-    
     # Find observer
     found = False
     for observer in observers:
