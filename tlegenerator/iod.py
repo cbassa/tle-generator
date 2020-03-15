@@ -5,65 +5,8 @@ import warnings
 from astropy.time import Time
 from astropy.coordinates import Angle, SkyCoord, FK4, FK5, ICRS
 import astropy.units as u
-
-class Observation:
-    """Observation class"""
-
-    def __init__(self, satno, desig_year, desig_id, site_id, obs_condition, t, st, p, sp, angle_format, epoch, iod_line, observer):
-        self.satno = satno
-        self.desig_year = desig_year
-        self.desig_id = desig_id
-        self.site_id = site_id
-        self.obs_condition = obs_condition
-        self.t = t
-        self.st = st
-        self.p = p
-        self.sp = sp
-        self.angle_format = angle_format
-        self.epoch = epoch
-        self.iod_line = iod_line.rstrip()
-        self.observer = observer
-
-    def __repr__(self):
-        return self.iod_line
-        
-class Observer:
-    """Observer class"""
-
-    def __init__(self, site_id, lat, lon, elev, name):
-        self.site_id = site_id
-        self.lat = lat
-        self.lon = lon
-        self.elev = elev
-        self.name = name
-
-    def __repr__(self):
-        return f"{self.site_id} {self.lat} {self.lon} {self.elev} {self.name}"
-
-def decode_observer(line):
-    site_id = int(line[0:4])
-    lat = float(line[8:17])
-    lon = float(line[18:27])
-    elev = float(line[28:34])
-    name = line[38:].rstrip()
-
-    return Observer(site_id, lat, lon, elev, name)
-
-        
-def read_observers(fname):
-    observers = []
-    with open(fname, "r") as fp:
-        lines = fp.readlines()
-
-        for line in lines:
-            if "#" in line:
-                continue
-
-            observers.append(decode_observer(line))
-
-    return observers
-            
-        
+from tlegenerator.observation import Observation
+           
 def is_iod_observation(line):
     iod_pattern = r"\d{5} \d{2} \d{3}... \d{4} . \d{17} \d{2} \d{2} \d{7}.\d{6} \d{2}"
 

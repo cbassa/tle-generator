@@ -5,8 +5,8 @@ import logging
 import configparser
 from pathlib import Path
 
-from tlegenerator.iod import is_iod_observation, decode_iod_observation, read_observers
-
+from tlegenerator.iod import is_iod_observation, decode_iod_observation
+from tlegenerator.observation import read_observers
 
 def ingest_observations(observations_path, newlines, observers):
     '''
