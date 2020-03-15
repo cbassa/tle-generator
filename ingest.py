@@ -26,10 +26,11 @@ def ingest_observations(observations_path, newlines, observers):
             # Skip bad observations
             if o is None:
                 logger.debug("Discarding %s" % newline.rstrip())
-                continue
-            
-            # Data file name
-            fname = Path(observations_path, f"{o.satno:05d}.dat")
+
+               
+                fname = Path(observations_path, "rejected.dat")
+            else:
+                fname = Path(observations_path, f"{o.satno:05d}.dat")
 
             # Read existing observations
             oldlines = []
