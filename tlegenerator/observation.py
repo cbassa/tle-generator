@@ -9,8 +9,6 @@ class Dataset:
     def __init__(self, observations):
         mjd = np.array([o.t.mjd for o in observations])
         self.tobs = Time(mjd, format="mjd")
-        self.raobs = np.array([o.p.ra.degree for o in observations])
-        self.decobs = np.array([o.p.dec.degree for o in observations])
         self.site_id = np.array([o.site_id for o in observations])
         self.perr = np.array([o.sp for o in observations])
         self.terr = np.array([o.st for o in observations])
@@ -21,6 +19,12 @@ class Dataset:
         self.robs = (r.get_xyz().to(u.km).value).T
         self.vobs = (v.get_xyz().to(u.km / u.s).value).T
         self.R = teme_to_gcrs_matrix(self.tobs)
+        raobs = np.array([o.p.ra.rad for o in observations])
+        decobs = np.array([o.p.dec.rad for o in observations])
+        self.uobs = np.array([np.cos(raobs) * np.cos(decobs),
+                              np.sin(raobs) * np.cos(decobs),
+                              np.sin(decobs)]).T
+        self.mask = np.ones(len(mjd), dtype="bool")
 
 class Observation:
     """Observation class"""
