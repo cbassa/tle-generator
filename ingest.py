@@ -25,7 +25,7 @@ def ingest_observations(observations_path, newlines, observers):
 
             # Skip bad observations
             if o is None:
-                logger.debug("Discarding %s" % newline.rstrip())
+                logger.debug(f"Discarding {newline.rstrip()}")
 
                
                 fname = Path(observations_path, "rejected.dat")
@@ -47,7 +47,7 @@ def ingest_observations(observations_path, newlines, observers):
             # Lines to write
             with open(fname, "w") as f:
                 for line in oldlines:
-                    f.write("%s" % line)
+                    f.write(f"{line}")
 
 
 if __name__ == "__main__":
@@ -77,14 +77,14 @@ if __name__ == "__main__":
     logger.addHandler(consoleHandler)
     logger.setLevel(logging.DEBUG)
 
-    logger.info("Using config: %s" % conf_file)
+    logger.info(f"Using config: {conf_file}")
 
     # Read observers
-    logger.info("Reading observers from %s" % cfg.get('Common', 'observers_file'))
+    logger.info(f"Reading observers from {cfg.get('Common', 'observers_file')}")
     observers = read_observers(cfg.get('Common', 'observers_file'))
 
     # Parse observations
-    logger.info("Parsing %s" % args.OBSERVATIONS_FILE)
+    logger.info(f"Parsing {args.OBSERVATIONS_FILE}")
     with open(args.OBSERVATIONS_FILE, errors="replace") as f:
         newlines = f.readlines()
         ingest_observations(cfg.get('Common', 'observations_path'), newlines, observers)
