@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 import sys
 import argparse
-import logging
 import configparser
+import logging
 import numpy as np
 import astropy.units as u
 from astropy.time import Time
@@ -50,17 +50,25 @@ def rms(x):
 
 if __name__ == "__main__":
     # Read command line arguments
-    parser = argparse.ArgumentParser(description='Preprocess observations.')
-    parser.add_argument('-c', '--conf_file',
+    parser = argparse.ArgumentParser(description="Preprocess observations.")
+    parser.add_argument("-c", "--catalog", type=str,
+                        help="Input TLE catalog to update",
+                        metavar="FILE")
+    parser.add_argument("-d", "--data", type=str,
+                        help="File with observations")
+    parser.add_argument("-i", "--ident", type=int,
+                        help="NORAD ID to update")
+    parser.add_argument("-l", "--length", type=float,
+                        help="Timespan (in days) to use for fitting) [default: 30]",
+                        default=30.0)
+    parser.add_argument("-C", "--conf_file",
                         help="Specify configuration file. If no file" +
                         " is specified 'configuration.ini' is used.",
                         metavar="FILE")
-    parser.add_argument('OBSERVATIONS_FILE', type=str,
-                        help='File with observations in IOD format')
     args = parser.parse_args()
 
     # Read configuration file
-    cfg = configparser.ConfigParser(inline_comment_prefixes=('#', ';'))
+    cfg = configparser.ConfigParser(inline_comment_prefixes=("#", ";"))
     conf_file = args.conf_file if args.conf_file else "configuration.ini"
     cfg.read(conf_file)
 
@@ -75,54 +83,71 @@ if __name__ == "__main__":
     logger.addHandler(consoleHandler)
     logger.setLevel(logging.DEBUG)
 
-    
     # Read observers
     logger.info(f"Reading observers from {cfg.get('Common', 'observers_file')}")
-    observers = read_observers(cfg.get('Common', 'observers_file'))
+    observers = read_observers(cfg.get("Common", "observers_file"))
 
     # Read observations
-    f = open(args.OBSERVATIONS_FILE, errors="replace")
-    newlines = f.readlines()
-    f.close()
+    try:
+        logger.info(f"Reading observations from {args.data}")
+        with open(args.data, errors="replace") as f:
+            newlines = f.readlines()
 
-    # Parse observations
-    observations = [decode_iod_observation(newline, observers) for newline in newlines]
+            # Parse observations
+            observations = [decode_iod_observation(newline, observers) for newline in newlines]
+            logger.info(f"{len(observations)} observations read")
+    except IOError as e:
+        logger.info(e)
+        sys.exit()
 
-    # Restructure
+    # Read TLE catalog
+    try:
+        logger.info(f"Reading TLEs from {args.catalog}")
+        with open(args.catalog, "r") as f:
+            lines = f.readlines()
+
+            # Parse TLEs
+            tles = [TwoLineElement(lines[i], lines[i+1], lines[i+2]) for i in range(0, len(lines), 3)]
+            logger.info(f"{len(tles)} TLEs read")
+    except IOError as e:
+        logger.info(e)
+        sys.exit()
+
+    # Restructure observations
     d = Dataset(observations)
 
-    tnew = Time("2020-01-08T00:00:00", format="isot", scale="utc")
-    tlength = 40 * u.d
-    d.mask = (d.tobs >= tnew - tlength) & (d.tobs < tnew)
-    imax = np.argmax(d.tobs[d.mask].mjd)
-    tnew = d.tobs[imax]
-    
-    # Read tle
-    fp = open("37386.txt", "r")
-    lines = fp.readlines()
-    fp.close()
-    tle = TwoLineElement(lines[0], lines[1], lines[2])
+    # Select observations
+    tmax = np.max(d.tobs)
+    tmin = tmax - args.length * u.d
+    d.mask = (d.tobs >= tmin) & (d.tobs < tmax)
+    logger.info(f"Last observation obtained at {tmax.isot}")
+    logger.info(f"{np.sum(d.mask)} observations selected")
 
+    # TODOD: Add automatic selection of closest TLE
+    tle = tles[0]
+    tleage = tmax - Time(tle.epoch, scale="utc")
+    logger.info(f"Latest tle ({tle.epochyr:02d}{tle.epochdoy:012.8f}) is {tleage.to(u.d).value:.2f} days old")
+    
     # Propagate
-    newepoch = tnew.datetime
+    newepoch = tmax.datetime
     newtle, converged = propagate(tle, newepoch)
+    logger.info(f"Propagating TLE to {newtle.epochyr:02d}{newtle.epochdoy:012.8f}")
     
     # Extract parameters
-    a = np.array([newtle.incl, newtle.node, newtle.ecc, newtle.argp, newtle.m, newtle.n, newtle.bstar])
+    p = np.array([newtle.incl, newtle.node, newtle.ecc, newtle.argp, newtle.m, newtle.n, newtle.bstar])
 
+    # Compute prefit RMS
+    prefit_rms = rms(residuals(p, newtle.satno, newtle.epochyr, newtle.epochdoy, d))
+    
     # Optimize
+    logger.info("Optimize least-squares fit")
     for i in range(10):
-        p = optimize.fmin(chisq, a, args=(newtle.satno, newtle.epochyr, newtle.epochdoy, d), disp=False)
-        r = residuals(p, newtle.satno, newtle.epochyr, newtle.epochdoy, d)
-        print(i, rms(r))
-        a = p
-    print(tnew.isot)
-    print(rms(r))
-    print(len(r), np.sum(d.mask))
+        p = optimize.fmin(chisq, p, args=(newtle.satno, newtle.epochyr, newtle.epochdoy, d), disp=False)
 
+    postfit_rms = rms(residuals(p, newtle.satno, newtle.epochyr, newtle.epochdoy, d))
+    logger.info(f"Pre-fit residuals {prefit_rms:.4f} degrees")
+    logger.info(f"Post-fit residuals {postfit_rms:.4f} degrees")
+    
     line0, line1, line2 = format_tle(newtle.satno, newtle.epochyr, newtle.epochdoy, *p, newtle.name, newtle.desig)
     print(f"{line0}\n{line1}\n{line2}")
 
-    for i in range(len(observations)):
-        if d.mask[i]:
-            print(observations[i].iod_line)
