@@ -13,6 +13,31 @@ from tlegenerator.twoline import TwoLineElement, format_tle, propagate
 from sgp4.api import Satrec
 from scipy import optimize
 
+def read_tles_from_file(fname):
+    try:
+        with open(fname) as f:
+            lines = f.readlines()
+    except IOError as e:
+        return None
+
+    tles = []
+    for i in range(1, len(lines)):
+        if (lines[i][0]=="2") and (lines[i-1][0]=="1"):
+            tles.append(TwoLineElement(lines[i-2], lines[i-1], lines[i]))
+
+    return tles
+
+def find_tle_before(tles, satno, tfind):
+    # Select information
+    satnos = np.array([tle.satno for tle in tles])
+    tepoch = Time([tle.epoch for tle in tles], format="datetime", scale="utc")
+    c  = (satnos == satno) & (tepoch < tfind)
+    tmax = np.max(tepoch[c])
+    c = (satnos==satno) & (tepoch == tmax)
+    for i, tle in enumerate(tles):
+        if c[i]:
+            return tle
+
 def residuals(a, satno, epochyr, epochdoy, d):
     # Format TLE from parameters
     line0, line1, line2 = format_tle(satno, epochyr, epochdoy, *a)
@@ -58,6 +83,8 @@ if __name__ == "__main__":
                         help="File with observations")
     parser.add_argument("-i", "--ident", type=int,
                         help="NORAD ID to update")
+    parser.add_argument("-t", "--endtime",
+                        help="Use observations upto this time (YYYY-MM-DDTHH:MM:SS) [default: now]")
     parser.add_argument("-l", "--length", type=float,
                         help="Timespan (in days) to use for fitting) [default: 30]",
                         default=30.0)
@@ -101,32 +128,41 @@ if __name__ == "__main__":
         sys.exit()
 
     # Read TLE catalog
-    try:
-        logger.info(f"Reading TLEs from {args.catalog}")
-        with open(args.catalog, "r") as f:
-            lines = f.readlines()
-
-            # Parse TLEs
-            tles = [TwoLineElement(lines[i], lines[i+1], lines[i+2]) for i in range(0, len(lines), 3)]
-            logger.info(f"{len(tles)} TLEs read")
-    except IOError as e:
-        logger.info(e)
+    logger.info(f"Reading TLEs from {args.catalog}")
+    tles = read_tles_from_file(args.catalog)
+    if tles is None:
+        logger.info(f"Error reading {args.catalog}")
         sys.exit()
+    logger.info(f"{len(tles)} TLEs read")
 
     # Restructure observations
     d = Dataset(observations)
 
     # Select observations
-    tmax = np.max(d.tobs)
+    if args.endtime is None:
+        # Use latest observation
+        tmax = np.max(d.tobs)
+    else:
+        try:
+            tend = Time(args.endtime, format="isot", scale="utc")
+            logging.info(f"Selecting observations before {tend.isot}")
+            c = d.tobs < tend
+            tmax = np.max(d.tobs[c])
+        except:
+            logging.info(f"Failed to parse {args.endtime}")
+            sys.exit
     tmin = tmax - args.length * u.d
     d.mask = (d.tobs >= tmin) & (d.tobs < tmax)
     logger.info(f"Last observation obtained at {tmax.isot}")
     logger.info(f"{np.sum(d.mask)} observations selected")
 
-    # TODOD: Add automatic selection of closest TLE
-    tle = tles[0]
+    # TODO: Add automatic selection of closest TLE
+    tle = find_tle_before(tles, args.ident, tmax)
     tleage = tmax - Time(tle.epoch, scale="utc")
-    logger.info(f"Latest tle ({tle.epochyr:02d}{tle.epochdoy:012.8f}) is {tleage.to(u.d).value:.2f} days old")
+    if tleage > 1e-5:
+        logger.info(f"Latest tle ({tle.epochyr:02d}{tle.epochdoy:012.8f}) is {tleage.to(u.d).value:.2f} days old")
+    else:
+        sys.exit()
     
     # Propagate
     newepoch = tmax.datetime
@@ -147,7 +183,16 @@ if __name__ == "__main__":
     postfit_rms = rms(residuals(p, newtle.satno, newtle.epochyr, newtle.epochdoy, d))
     logger.info(f"Pre-fit residuals {prefit_rms:.4f} degrees")
     logger.info(f"Post-fit residuals {postfit_rms:.4f} degrees")
-    
+
+    # Format TLE
     line0, line1, line2 = format_tle(newtle.satno, newtle.epochyr, newtle.epochdoy, *p, newtle.name, newtle.desig)
-    print(f"{line0}\n{line1}\n{line2}")
+
+    logger.info(f"{line0}")
+    logger.info(f"{line1}")
+    logger.info(f"{line2}")
+    
+    # Store
+    with open(args.catalog, "a+") as f:
+        f.write(f"{line0}\n{line1}\n{line2}\n")
+        f.write(f"# {tmin.mjd}-{tmax.mjd}, {np.sum(d.mask)} measurements, {postfit_rms:.4f} deg rms\n")
 
