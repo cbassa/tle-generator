@@ -144,6 +144,8 @@ if __name__ == "__main__":
     logger.info(f"{line1}")
     logger.info(f"{line2}")
 
+    newtle = tle
+    
     # Get in-track, cross-track residuals
     dt, dr = track_residuals(newtle, d)
 
