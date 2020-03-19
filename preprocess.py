@@ -6,72 +6,15 @@ import logging
 import numpy as np
 import astropy.units as u
 from astropy.time import Time
-from datetime import datetime
 from tlegenerator.iod import decode_iod_observation
 from tlegenerator.observation import read_observers, Dataset
 from tlegenerator.twoline import TwoLineElement, format_tle, propagate
-from sgp4.api import Satrec
+from tlegenerator.twoline import read_tles_from_file, find_tle_before
+from tlegenerator.optimize import residuals, chisq, rms, track_residuals
 from scipy import optimize
-
-def read_tles_from_file(fname):
-    try:
-        with open(fname) as f:
-            lines = f.readlines()
-    except IOError as e:
-        return None
-
-    tles = []
-    for i in range(1, len(lines)):
-        if (lines[i][0]=="2") and (lines[i-1][0]=="1"):
-            tles.append(TwoLineElement(lines[i-2], lines[i-1], lines[i]))
-
-    return tles
-
-def find_tle_before(tles, satno, tfind):
-    # Select information
-    satnos = np.array([tle.satno for tle in tles])
-    tepoch = Time([tle.epoch for tle in tles], format="datetime", scale="utc")
-    c  = (satnos == satno) & (tepoch < tfind)
-    tmax = np.max(tepoch[c])
-    c = (satnos==satno) & (tepoch == tmax)
-    for i, tle in enumerate(tles):
-        if c[i]:
-            return tle
-
-def residuals(a, satno, epochyr, epochdoy, d):
-    # Format TLE from parameters
-    line0, line1, line2 = format_tle(satno, epochyr, epochdoy, *a)
-
-    # Set up satellite
-    sat = Satrec.twoline2rv(line1, line2)
-    
-    # Compute integer and fractional JD
-    jdint = np.floor(d.tobs.jd[d.mask])
-    jdfrac = d.tobs.jd[d.mask] - jdint
-    
-    # Evaluate SGP4
-    e, rsat_teme, vsat_teme = sat.sgp4_array(jdint, jdfrac)
-
-    # Convert to GCRS
-    rsat = np.einsum("i...jk,i...k->i...j", d.R[d.mask], rsat_teme)
-    vsat = np.einsum("i...jk,i...k->i...j", d.R[d.mask], vsat_teme)
-
-    # Compute unit vectors
-    dr = rsat - d.robs[d.mask]
-    r = np.linalg.norm(dr, axis=1)
-    upred = dr / r[:, np.newaxis]
-
-    # Compute residuals (in degrees)
-    res = np.arccos(np.sum(d.uobs[d.mask] * upred, axis=1)) * 180 / np.pi
-    
-    return res
-
-def chisq(a, satno, epochyr, epochdoy, d):
-    return np.sum(residuals(a, satno, epochyr, epochdoy, d)**2)
-
-def rms(x):
-    return np.sqrt(np.sum(x**2) / len(x))
-
+import matplotlib.pyplot as plt
+from matplotlib.ticker import AutoMinorLocator
+import matplotlib.dates as mdates
 
 if __name__ == "__main__":
     # Read command line arguments
@@ -109,7 +52,7 @@ if __name__ == "__main__":
     consoleHandler.setFormatter(logFormatter)
     logger.addHandler(consoleHandler)
     logger.setLevel(logging.DEBUG)
-
+    logging.getLogger('matplotlib').setLevel(logging.ERROR)
     # Read observers
     logger.info(f"Reading observers from {cfg.get('Common', 'observers_file')}")
     observers = read_observers(cfg.get("Common", "observers_file"))
@@ -136,6 +79,7 @@ if __name__ == "__main__":
     logger.info(f"{len(tles)} TLEs read")
 
     # Restructure observations
+    logger.info("Converting observations")
     d = Dataset(observations)
 
     # Select observations
@@ -166,9 +110,9 @@ if __name__ == "__main__":
     
     # Propagate
     newepoch = tmax.datetime
-    newtle, converged = propagate(tle, newepoch)
+    newtle, converged = propagate(tle, newepoch, drmin=1e-3, dvmin=1e-6, niter=100)
     logger.info(f"Propagating TLE to {newtle.epochyr:02d}{newtle.epochdoy:012.8f}")
-    
+
     # Extract parameters
     p = np.array([newtle.incl, newtle.node, newtle.ecc, newtle.argp, newtle.m, newtle.n, newtle.bstar])
 
@@ -186,13 +130,70 @@ if __name__ == "__main__":
 
     # Format TLE
     line0, line1, line2 = format_tle(newtle.satno, newtle.epochyr, newtle.epochdoy, *p, newtle.name, newtle.desig)
-
+    newtle = TwoLineElement(line0, line1, line2)
+    
     logger.info(f"{line0}")
     logger.info(f"{line1}")
     logger.info(f"{line2}")
+
+    dt, dr = track_residuals(newtle, d)
+    print(rms(dt), rms(dr))
+
+    tobs = d.tobs[d.mask]
+    terr = d.terr[d.mask]
+    perr = d.perr[d.mask]
+    sites = d.site_id[d.mask]
+    
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(10, 8))
+
+    uniq_sites = np.unique(sites)
+    sequence = np.arange(len(dt))
+    for site in uniq_sites:
+        c = site == sites
+        print(site, np.sum(c))
+        ax1.errorbar(tobs[c].datetime, dt[c], yerr=terr[c], fmt=".", label=f"{site:d}")
+        ax2.errorbar(tobs[c].datetime, dr[c], yerr=perr[c], fmt=".", label=f"{site:d}")
+        ax3.errorbar(sequence[c], dt[c], yerr=terr[c], fmt=".", label=f"{site:d}")
+        ax4.errorbar(sequence[c], dr[c], yerr=perr[c], fmt=".", label=f"{site:d}")
+
+    dtmax, drmax = np.max(np.abs(dt)), np.max(np.abs(dr))
+    ax1.set_ylim(-1.5 * dtmax, 1.5 * dtmax)
+    ax2.set_ylim(-1.5 * drmax, 1.5 * drmax)
+    ax3.set_ylim(-1.5 * dtmax, 1.5 * dtmax)
+    ax4.set_ylim(-1.5 * drmax, 1.5 * drmax)
+    ax1.axhline(0, color="k")
+    ax2.axhline(0, color="k")
+    ax3.axhline(0, color="k")
+    ax4.axhline(0, color="k")
+    ax3.set_xlabel("Sequence")
+    ax4.set_xlabel("Sequence")
+
+    #ax1.yaxis.set_minor_locator(AutoMinorLocator(5))
+    #ax2.yaxis.set_minor_locator(AutoMinorLocator(6))
+    #ax3.yaxis.set_minor_locator(AutoMinorLocator(5))
+    #ax3.xaxis.set_minor_locator(AutoMinorLocator(6))
+    #ax4.yaxis.set_minor_locator(AutoMinorLocator(6))
+    #ax4.xaxis.set_minor_locator(AutoMinorLocator(6))
+    #ax1.xaxis.set_major_locator(mdates.WeekdayLocator())
+    #ax2.xaxis.set_major_locator(mdates.WeekdayLocator())
+    #ax1.xaxis.set_minor_locator(AutoMinorLocator(7))
+    #ax2.xaxis.set_minor_locator(AutoMinorLocator(7))
+    
+    ax1.grid()
+    ax2.grid()
+    ax3.grid()
+    ax4.grid()
+    ax1.set_ylabel("Time offset (s)")
+    ax2.set_ylabel(r"Angular offset ($^\circ$)")
+    ax3.set_ylabel("Time offset (s)")
+    ax4.set_ylabel(r"Angular offset ($^\circ$)")
+    ax1.legend(ncol=len(uniq_sites))
+    plt.tight_layout()
+    plt.savefig("residuals.png", bbox_inches="tight")
+ 
     
     # Store
-    with open(args.catalog, "a+") as f:
-        f.write(f"{line0}\n{line1}\n{line2}\n")
-        f.write(f"# {tmin.mjd}-{tmax.mjd}, {np.sum(d.mask)} measurements, {postfit_rms:.4f} deg rms\n")
+    #with open(args.catalog, "a+") as f:
+    #    f.write(f"{line0}\n{line1}\n{line2}\n")
+    #    f.write(f"# {tmin.mjd}-{tmax.mjd}, {np.sum(d.mask)} measurements, {postfit_rms:.4f} deg rms\n")
 

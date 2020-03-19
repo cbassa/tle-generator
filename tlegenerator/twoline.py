@@ -2,6 +2,7 @@
 import math
 import numpy as np
 from datetime import datetime
+from astropy.time import Time
 from sgp4.api import Satrec, jday
 
 # Using definition from https://celestrak.com/columns/v04n03/
@@ -198,7 +199,7 @@ def datetime_to_epoch(t):
 
     return epochyr, epochdoy
 
-def propagate(tle, t):
+def propagate(tle, t, drmin=1e-1, dvmin=1e-3, niter=100):
     # New epoch
     epochyr, epochdoy = datetime_to_epoch(t)
     jd, fr = jday(t.year, t.month, t.day, t.hour, t.minute, t.second + t.microsecond / 1000000)
@@ -211,7 +212,7 @@ def propagate(tle, t):
     # Start loop
     rnew, vnew = r0, v0
     converged = False
-    for i in range(100):
+    for i in range(niter):
         # Convert state vector into new TLE
         newtle = classical_elements(rnew, vnew, epochyr, epochdoy, tle)
         
@@ -225,7 +226,7 @@ def propagate(tle, t):
         drm, dvm = np.linalg.norm(dr), np.linalg.norm(dv)
         
         # Exit check
-        if (np.abs(drm) < 1e-1) and (np.abs(dvm) < 1e-3):
+        if (np.abs(drm) < drmin) and (np.abs(dvm) < dvmin):
             converged = True
             break
         
@@ -304,3 +305,28 @@ def classical_elements(r, v, epochyr, epochdoy, tle):
                                      tle.ndot, tle.nddot, tle.ephtype, tle.elnum, tle.revnum)
 
     return TwoLineElement(line0, line1, line2)
+
+def read_tles_from_file(fname):
+    try:
+        with open(fname) as f:
+            lines = f.readlines()
+    except IOError as e:
+        return None
+
+    tles = []
+    for i in range(1, len(lines)):
+        if (lines[i][0]=="2") and (lines[i-1][0]=="1"):
+            tles.append(TwoLineElement(lines[i-2], lines[i-1], lines[i]))
+
+    return tles
+
+def find_tle_before(tles, satno, tfind):
+    # Select information
+    satnos = np.array([tle.satno for tle in tles])
+    tepoch = Time([tle.epoch for tle in tles], format="datetime", scale="utc")
+    c  = (satnos == satno) & (tepoch < tfind)
+    tmax = np.max(tepoch[c])
+    c = (satnos==satno) & (tepoch == tmax)
+    for i, tle in enumerate(tles):
+        if c[i]:
+            return tle

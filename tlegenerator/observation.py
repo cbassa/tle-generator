@@ -19,11 +19,11 @@ class Dataset:
         self.robs = (r.get_xyz().to(u.km).value).T
         self.vobs = (v.get_xyz().to(u.km / u.s).value).T
         self.R = teme_to_gcrs_matrix(self.tobs)
-        raobs = np.array([o.p.ra.rad for o in observations])
-        decobs = np.array([o.p.dec.rad for o in observations])
-        self.uobs = np.array([np.cos(raobs) * np.cos(decobs),
-                              np.sin(raobs) * np.cos(decobs),
-                              np.sin(decobs)]).T
+        self.raobs = np.array([o.p.ra.rad for o in observations])
+        self.decobs = np.array([o.p.dec.rad for o in observations])
+        self.uobs = np.array([np.cos(self.raobs) * np.cos(self.decobs),
+                              np.sin(self.raobs) * np.cos(self.decobs),
+                              np.sin(self.decobs)]).T
         self.mask = np.ones(len(mjd), dtype="bool")
 
 class Observation:
