@@ -15,11 +15,11 @@ def ingest_observations(observations_path, newlines, observers):
 
     # Check if IOD
     for newline in newlines:
+        # Clean line
+        newline = newline.replace("\xa0", " ")
+
         # Check if this is an IOD observation
         if is_iod_observation(newline):
-            # Clean line
-            newline = newline.replace("\xa0", " ")
-            
             # Decode IOD observation
             o = decode_iod_observation(newline, observers)
 
@@ -27,7 +27,6 @@ def ingest_observations(observations_path, newlines, observers):
             if o is None:
                 logger.debug(f"Discarding {newline.rstrip()}")
 
-               
                 fname = Path(observations_path, "rejected.dat")
             else:
                 fname = Path(observations_path, f"{o.satno:05d}.dat")

@@ -7,20 +7,25 @@ from astropy.coordinates import EarthLocation
 
 class Dataset:
     def __init__(self, observations):
+        # Get MJD timestamps
         mjd = np.array([o.t.mjd for o in observations])
-        self.tobs = Time(mjd, format="mjd")
-        self.site_id = np.array([o.site_id for o in observations])
-        self.perr = np.array([o.sp for o in observations])
-        self.terr = np.array([o.st for o in observations])
-        lat = np.array([o.observer.lat for o in observations]) * u.deg
-        lon = np.array([o.observer.lon for o in observations]) * u.deg
-        elev = np.array([o.observer.elev for o in observations]) * u.m
+
+        # Sort on time
+        idx = np.argsort(mjd)
+        
+        self.tobs = Time(mjd[idx], format="mjd")
+        self.site_id = np.array([o.site_id for o in observations])[idx]
+        self.perr = np.array([o.sp for o in observations])[idx]
+        self.terr = np.array([o.st for o in observations])[idx]
+        lat = np.array([o.observer.lat for o in observations])[idx] * u.deg
+        lon = np.array([o.observer.lon for o in observations])[idx] * u.deg
+        elev = np.array([o.observer.elev for o in observations])[idx] * u.m
         r, v = EarthLocation(lat=lat, lon=lon, height=elev).get_gcrs_posvel(self.tobs)
         self.robs = (r.get_xyz().to(u.km).value).T
         self.vobs = (v.get_xyz().to(u.km / u.s).value).T
         self.R = teme_to_gcrs_matrix(self.tobs)
-        self.raobs = np.array([o.p.ra.rad for o in observations])
-        self.decobs = np.array([o.p.dec.rad for o in observations])
+        self.raobs = np.array([o.p.ra.rad for o in observations])[idx]
+        self.decobs = np.array([o.p.dec.rad for o in observations])[idx]
         self.uobs = np.array([np.cos(self.raobs) * np.cos(self.decobs),
                               np.sin(self.raobs) * np.cos(self.decobs),
                               np.sin(self.decobs)]).T
