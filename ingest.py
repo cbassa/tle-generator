@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import sys
 import argparse
 import logging
@@ -13,6 +14,8 @@ def ingest_observations(observations_path, newlines, observers):
     Reads a list of IOD observation strings and writes them into the common file structure.
     '''
 
+    
+    
     # Check if IOD
     for newline in newlines:
         # Clean line
@@ -82,6 +85,10 @@ if __name__ == "__main__":
     logger.info(f"Reading observers from {cfg.get('Common', 'observers_file')}")
     observers = read_observers(cfg.get('Common', 'observers_file'))
 
+    # Generate directory
+    if not os.path.exists(cfg.get('Common', 'observations_path')):
+        os.makedirs(cfg.get('Common', 'observations_path'))
+    
     # Parse observations
     logger.info(f"Parsing {args.OBSERVATIONS_FILE}")
     with open(args.OBSERVATIONS_FILE, errors="replace") as f:
