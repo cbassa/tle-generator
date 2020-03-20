@@ -22,24 +22,18 @@ Consider using a VirtualEnv to run stvid on a separate python virtual environmen
 - Copy the `configuration.ini-dist` file to `configuration.ini`
 - Edit `configuration.ini` with your preferred settings
 
-## File structure
-
-- Generate the expected file structure with `init_paths.py`
-
-
 ## Example usage
-
-- Read an observation file and plot the brightness vs time:
-  ```
-  ./read_iod.py examples/obs_20190507.dat
-  ```
 
 - Import new observations (IOD format) into storage:
   ```
-  ./ingest.py examples/obs_20190507.dat
+  ./ingest.py examples/example.dat
+  ```
+- Update TLE for object 37386 with:
+  ```
+  ./preprocess.py -c elements/37386.txt -d observations/37386.dat -i 37386
   ```
 
 ## License
-&copy; 2019 Cees Bassa
+&copy; 2020 Cees Bassa
 
 Licensed under the [GPLv3 or later](LICENSE).
