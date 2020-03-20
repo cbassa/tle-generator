@@ -1,5 +1,5 @@
-astropy==3.2.3
-ephem==3.7.7.0
-matplotlib==3.1.1
-numpy==1.17.3
-scipy==1.3.1
+astropy
+matplotlib
+numpy
+scipy
+sgp4
