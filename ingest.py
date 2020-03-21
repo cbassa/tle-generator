@@ -6,12 +6,12 @@ import logging
 import configparser
 from pathlib import Path
 
-from tlegenerator.iod import is_iod_observation, decode_iod_observation
-from tlegenerator.iod import is_uk_observation, decode_uk_observation
-from tlegenerator.iod import is_rde_preamble, is_rde_date, is_rde_end
-from tlegenerator.iod import is_rde_observation, decode_rde_observation
+from tlegenerator.formats import is_iod_observation, decode_iod_observation
+from tlegenerator.formats import is_uk_observation, decode_uk_observation
+from tlegenerator.formats import is_rde_preamble, is_rde_date, is_rde_end
+from tlegenerator.formats import is_rde_observation, decode_rde_observation
 
-from tlegenerator.iod import read_identifiers
+from tlegenerator.formats import read_identifiers
 from tlegenerator.observation import read_observers
 
 def ingest_observations(observations_path, newlines, observers, identifiers):

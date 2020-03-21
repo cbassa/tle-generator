@@ -6,7 +6,7 @@ import logging
 import numpy as np
 import astropy.units as u
 from astropy.time import Time
-from tlegenerator.iod import decode_iod_observation
+from tlegenerator.formats import decode_iod_observation
 from tlegenerator.observation import read_observers, Dataset
 from tlegenerator.twoline import TwoLineElement, format_tle, propagate
 from tlegenerator.twoline import read_tles_from_file, find_tle_before
