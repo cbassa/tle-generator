@@ -8,6 +8,9 @@ from pathlib import Path
 
 from tlegenerator.iod import is_iod_observation, decode_iod_observation
 from tlegenerator.iod import is_uk_observation, decode_uk_observation
+from tlegenerator.iod import is_rde_preamble, is_rde_date, is_rde_end
+from tlegenerator.iod import is_rde_observation, decode_rde_observation
+
 from tlegenerator.iod import read_identifiers
 from tlegenerator.observation import read_observers
 
@@ -15,22 +18,44 @@ def ingest_observations(observations_path, newlines, observers, identifiers):
     '''
     Reads a list of observation strings and writes them into the common file structure.
     '''
+
+    # Set up values for RDE format
+    is_rde = False
     
     # Loop over lines
     for newline in newlines:
         # Clean line
         newline = newline.replace("\xa0", " ")
-
-        # Check if this is an observation in IOD format
+        
+        # Check if this line is an observation in the IOD format
         if is_iod_observation(newline):
             # Decode IOD observation
             o = decode_iod_observation(newline, observers)
-        # Check if this is an observation in UK format
+        # Check if this line is an observation in the UK format
         elif is_uk_observation(newline):
             # Decode UK observation
             o = decode_uk_observation(newline, observers, identifiers)
             if o is not None:
                 o = decode_iod_observation(o.iod_line, observers)
+        # Check if this line is a preamble to an observation in the RDE format
+        elif is_rde_preamble(newline):
+            is_rde = True
+            rde_preamble = newline.rstrip()
+            rde_date = None
+            continue
+        # Check if this line is the date of an observation in the RDE format
+        elif is_rde_date(newline) and is_rde:
+            rde_date = int(newline)
+            continue
+        # Check if this line is an observation in the RDE format
+        elif is_rde_observation(newline) and is_rde:
+            o = decode_rde_observation(rde_preamble, rde_date, newline, observers, identifiers)
+            if o is not None:
+                o = decode_iod_observation(o.iod_line, observers)            
+        # Check if this line signals the end of an RDE observation report
+        elif is_rde_end(newline) and is_rde:
+            is_rde = False
+            continue
         # Skip otherwise
         else:
             continue

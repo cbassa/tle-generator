@@ -9,26 +9,62 @@ import astropy.units as u
 from tlegenerator.observation import Observation
            
 def is_iod_observation(line):
-    iod_pattern = r"\d{5} \d{2} \d{3}... \d{4} . \d{17} \d{2} \d{2} \d{7}.\d{6} \d{2}"
+    pattern = r"\d{5} \d{2} \d{3}... \d{4} . \d{17} \d{2} \d{2} \d{7}.\d{6} \d{2}"
 
-    if re.match(iod_pattern, line) is not None:
+    if re.match(pattern, line) is not None:
         return True
     else:
         return False
 
 def is_uk_observation(line):
-    uk_pattern = r"\d{20}"
+    pattern = r"\d{20}"
 
-    if re.match(uk_pattern, line) is not None:
+    if re.match(pattern, line) is not None:
         return True
     else:
         return False
 
+def is_rde_preamble(line):
+    pattern = r"\d{4} \d{4} \d{1}\.\d{3} \d{4}"
+
+    if re.match(pattern, line) is not None:
+        return True
+    else:
+        return False
+
+def is_rde_date(line):
+    pattern = r"\d{2}\n"
+
+    if re.match(pattern, line) is not None:
+        return True
+    else:
+        return False
+    
+def is_rde_observation(line):
+    pattern = r"\d{7} \d{6}\.\d{2} \d{6}.\d{6}"
+
+    if re.match(pattern, line) is not None:
+        return True
+    else:
+        return False
+
+def is_rde_end(line):
+    pattern = r"999"
+
+    if re.match(pattern, line) is not None:
+        return True
+    else:
+        return False
     
 def insert_into_string(s, i, c):
     """Insert character c into string s at index i"""
 
     return s[:i] + c + s[i:]
+
+def decode_HHMMSS(s):
+    s = insert_into_string(s, 4, "m")
+    s = insert_into_string(s, 2, "h")
+    return Angle(s)
 
 def decode_HHMMSSs(s):
     s = insert_into_string(s, 8, "s")
@@ -88,6 +124,9 @@ def read_identifiers(fname):
     return d
 
 def number_to_letter(n):
+    # 
+    if n == 0:
+        return ""
     x = (n - 1) % 24
     letters = "ABCDEFGHJKLMNPQRSTUVWXYZ"
     rest = (n - 1) // 24
@@ -95,6 +134,122 @@ def number_to_letter(n):
         return letters[x]
     return number_to_letter(rest) + letters[x]
 
+def decode_rde_observation(rde_preamble, rde_date, rde_line, observers, identifiers):
+    # International designator
+    desig_year, desig_num, desig_part = int(rde_line[0:2]), int(rde_line[2:5]), number_to_letter(int(rde_line[5:7]))
+    desig_id = f"{desig_num:03d}{desig_part:s}"
+    desig = f"{desig_year:02d}{desig_id}"
+    
+    # Find satno
+    satno = 99999
+    for ident in identifiers:
+        if ident["desig"] == desig:
+            satno = ident["satno"]
+    # Set dummy designation for unknown
+    if satno == 99999:
+        desig, desig_year, desig_id = "99000A", 99, "000A"
+            
+    # Site identifier
+    site_id = int(rde_preamble[0:4])
+
+    # Decode timestamp
+    year = int(rde_preamble[5:7])
+    month = int(rde_preamble[7:9])
+    day = rde_date
+    hour = int(rde_line[8:10])
+    minute = int(rde_line[10:12])
+    sec = float(rde_line[12:17])
+    if year < 57:
+        year += 2000
+    else:
+        year += 1900
+    timestamp = f"{year:04d}-{month:02d}-{day:02d}T{hour:02d}:{minute:02d}:{sec:06.3f}"
+    iod_timestamp = f"{year:04d}{month:02d}{day:02d}{hour:02d}{minute:02d}{1000*sec:05.0f}"    
+
+    # Set up to catch warnings
+    with warnings.catch_warnings(record=True) as w:
+        try:
+            t = Time(timestamp, format="isot", scale="utc")
+        except ValueError:
+            logging.debug("Failed to decode timestamp")                              
+            return None
+
+        # Time uncertainty
+        st = float(rde_preamble[10:13])
+
+        # Time and angle format
+        time_format, angle_format = int(rde_preamble[13]), int(rde_preamble[14])
+
+        # Position uncertainty
+        sp = float(rde_preamble[16:19])
+
+        # Epoch code
+        epoch = int(rde_preamble[19])
+
+        # Discard bad epochs
+        if epoch!=4:
+            logging.debug("Epoch not implemented")
+            return None
+
+        # Decode angles
+        p = None
+        angle1 = rde_line[18:24]
+        angle2 = rde_line[24:31]
+        if angle_format == 1:
+            # Format 1: RA/DEC = HHMMSS+DDMMSS (seconds of arc, SSSs)
+            try:
+                ra = decode_HHMMSS(angle1)
+                dec = decode_DDMMSS(angle2)
+                p = SkyCoord(ra=ra, dec=dec, frame=FK4).transform_to(FK5)
+            except:
+                logging.debug("Failed to decode position")
+                p = None
+            sp = sp / 3600
+        else:
+            logging.debug("Format not implemented")
+            p = None
+
+    # Discard observations with warnings
+    if len(w)>0:
+        logging.debug(str(w[-1].message))
+        return None
+
+    # Find observer
+    found = False
+    for observer in observers:
+        if observer.site_id == site_id:
+            found = True
+            break
+        
+    # Discard observations with missing site information
+    if not found:
+        logging.debug(f"Site information missing for {site_id}")
+        return None
+
+    # Encode time uncertainty
+    tx = int(np.floor(np.log10(st)) + 8)
+    tm = int(np.floor(st * 10**(-(tx - 8))))
+
+    # Encode position uncertainty
+    px = int(np.floor(np.log10(sp)) + 8)
+    pm = int(np.floor(sp * 10**(-(px - 8))))
+
+    # Set observing condition
+    obs_condition = "G"
+    
+    # Encode position
+    sra = p.ra.to_string(sep=":", unit="hour", pad=True, precision=1).replace(":", "").replace(".", "")
+    sdec = p.dec.to_string(sep=":", unit="deg", alwayssign=True, pad=True, precision=0).replace(":", "")
+    pstr = f"{sra}{sdec}"
+
+    # Format IOD line
+    iod_line = f"{satno:05d} {desig_year:02d} {desig_id:<6s} {site_id:04d} {obs_condition:1s} {iod_timestamp} {tm:1d}{tx:1d} 15 {pstr} {pm:1d}{px:1d}"
+
+    # Format observation
+    o = Observation(satno, desig_year, desig_id, site_id, obs_condition, t, st, p, sp, angle_format, epoch, iod_line, observer)
+        
+    return o
+    
 def decode_uk_observation(uk_line, observers, identifiers):
     # International designator
     desig_year, desig_num, desig_part = int(uk_line[0:2]), int(uk_line[2:5]), number_to_letter(int(uk_line[5:7]))
@@ -106,6 +261,9 @@ def decode_uk_observation(uk_line, observers, identifiers):
     for ident in identifiers:
         if ident["desig"] == desig:
             satno = ident["satno"]
+    # Set dummy designation for unknown
+    if satno == 99999:
+        desig, desig_year, desig_id = "99000A", 99, "000A"
 
     # Site identifier
     site_id = int(uk_line[7:11])
@@ -214,15 +372,14 @@ def decode_uk_observation(uk_line, observers, identifiers):
     # Set observing condition
     obs_condition = "G"
     
-    # Encode position (assumes to_string returns HH:MM:SS.S +DD:MM:SS)
-    rah, ram, ras = p.ra.hms
-    ded, dem, des = p.dec.dms
-    pstr = f"{rah:02.0f}{ram:02.0f}{10 * ras:03.0f}{ded:+03.0f}{np.abs(dem):02.0f}{np.abs(des):02.0f}"
-    
-    #pstr = p.to_string("hmsdms").replace("h", "").replace("m", "").replace("s", "").replace("d", "").replace(" ", "").replace(".", "")
+    # Encode position
+    sra = p.ra.to_string(sep=":", unit="hour", pad=True, precision=1).replace(":", "").replace(".", "")
+    sdec = p.dec.to_string(sep=":", unit="deg", alwayssign=True, pad=True, precision=0).replace(":", "")
+    pstr = f"{sra}{sdec}"
 
     # Format IOD line
     iod_line = f"{satno:05d} {desig_year:02d} {desig_id:<6s} {site_id:04d} {obs_condition:1s} {iod_timestamp} {tm:1d}{tx:1d} 15 {pstr} {pm:1d}{px:1d}"
+
     # Format observation
     o = Observation(satno, desig_year, desig_id, site_id, obs_condition, t, st, p, sp, angle_format, epoch, iod_line, observer)
         
