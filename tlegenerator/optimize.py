@@ -82,3 +82,9 @@ def track_residuals(tle, d):
     dr = rxobs * sa + ryobs * ca
 
     return dt, dr.to(u.deg).value
+
+def format_time_for_output(t):
+    fday = t.mjd - np.floor(t.mjd)
+    day = t.datetime.day + fday
+    year, month = t.datetime.year, t.datetime.month
+    return f"{year:04d}{month:02d}{day:05.2f}"

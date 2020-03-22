@@ -33,9 +33,9 @@ def is_rde_preamble(line):
         return False
 
 def is_rde_date(line):
-    pattern = r"\d{2}\n"
+    pattern = r"\d{2}"
 
-    if re.match(pattern, line) is not None:
+    if re.match(pattern, line) is not None and len(line) == 2:
         return True
     else:
         return False
@@ -231,8 +231,10 @@ def decode_rde_observation(rde_preamble, rde_date, rde_line, observers, identifi
     tm = int(np.floor(st * 10**(-(tx - 8))))
 
     # Encode position uncertainty
-    px = int(np.floor(np.log10(sp)) + 8)
-    pm = int(np.floor(sp * 10**(-(px - 8))))
+    if sp > 0.025:
+        sp = 0.025
+    px = int(np.floor(np.log10(sp * 3600)) + 8)
+    pm = int(np.floor(sp * 10**(-(px - 8)) * 3600))
 
     # Set observing condition
     obs_condition = "G"
@@ -366,8 +368,10 @@ def decode_uk_observation(uk_line, observers, identifiers):
     tm = int(np.floor(st * 10**(-(tx - 8))))
 
     # Encode position uncertainty
-    px = int(np.floor(np.log10(sp)) + 8)
-    pm = int(np.floor(sp * 10**(-(px - 8))))
+    if sp > 0.025:
+        sp = 0.025
+    px = int(np.floor(np.log10(sp * 3600)) + 8)
+    pm = int(np.floor(sp * 10**(-(px - 8)) * 3600))
 
     # Set observing condition
     obs_condition = "G"
@@ -431,7 +435,7 @@ def decode_iod_observation(iod_line, observers):
         # Parse positional error
         me, xe = int(iod_line[62]), int(iod_line[63])
         sp = me * 10**(xe - 8)
-        
+
         # Decode angles
         p = None
         angle1 = iod_line[47:54]

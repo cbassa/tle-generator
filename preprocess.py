@@ -97,7 +97,7 @@ if __name__ == "__main__":
             logging.info(f"Failed to parse {args.endtime}")
             sys.exit
     logging.info(f"Selecting observations before {tend.isot}")
-    c = d.tobs < tend
+    c = d.tobs <= tend
     if np.sum(c) == 0:
         logging.info(f"No observations selected")
         sys.exit()

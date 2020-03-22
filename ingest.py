@@ -21,12 +21,13 @@ def ingest_observations(observations_path, newlines, observers, identifiers):
 
     # Set up values for RDE format
     is_rde = False
+    has_rde_date = False
     
     # Loop over lines
     for newline in newlines:
         # Clean line
-        newline = newline.replace("\xa0", " ")
-        
+        newline = newline.replace("\xa0", " ").rstrip()
+
         # Check if this line is an observation in the IOD format
         if is_iod_observation(newline):
             # Decode IOD observation
@@ -40,21 +41,23 @@ def ingest_observations(observations_path, newlines, observers, identifiers):
         # Check if this line is a preamble to an observation in the RDE format
         elif is_rde_preamble(newline):
             is_rde = True
-            rde_preamble = newline.rstrip()
+            rde_preamble = newline
             rde_date = None
             continue
         # Check if this line is the date of an observation in the RDE format
         elif is_rde_date(newline) and is_rde:
             rde_date = int(newline)
+            has_rde_date = True
             continue
         # Check if this line is an observation in the RDE format
-        elif is_rde_observation(newline) and is_rde:
+        elif is_rde_observation(newline) and is_rde and has_rde_date:
             o = decode_rde_observation(rde_preamble, rde_date, newline, observers, identifiers)
             if o is not None:
                 o = decode_iod_observation(o.iod_line, observers)            
         # Check if this line signals the end of an RDE observation report
         elif is_rde_end(newline) and is_rde:
             is_rde = False
+            has_rde_date = False
             continue
         # Skip otherwise
         else:
@@ -62,7 +65,7 @@ def ingest_observations(observations_path, newlines, observers, identifiers):
             
         # Skip bad observations
         if o is None:
-            logger.debug(f"Discarding {newline.rstrip()}")
+            logger.debug(f"Discarding {newline}")
 
             fname = Path(observations_path, "rejected.dat")
             iod_line = newline
@@ -78,6 +81,9 @@ def ingest_observations(observations_path, newlines, observers, identifiers):
                 # NOTE: This might take a considerable amount of RAM
                 # if there are many obs as it reads all previous observations.
 
+        # Strip oldlines
+        oldlines = [line.rstrip() for line in oldlines]
+                
         # Append if no duplicate
         if not iod_line in oldlines:
             oldlines.append(iod_line)
@@ -85,7 +91,7 @@ def ingest_observations(observations_path, newlines, observers, identifiers):
         # Lines to write
         with open(fname, "w") as f:
             for line in oldlines:
-                f.write(f"{line.rstrip()}\n")
+                f.write(f"{line}\n")
 
 
 if __name__ == "__main__":
