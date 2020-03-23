@@ -34,7 +34,7 @@ def residuals(a, satno, epochyr, epochdoy, d):
     return res
 
 def chisq(a, satno, epochyr, epochdoy, d):
-    return np.sum(residuals(a, satno, epochyr, epochdoy, d)**2)
+    return np.sum((residuals(a, satno, epochyr, epochdoy, d) / d.perr[d.mask] * d.weight[d.mask])**2)
 
 def rms(x):
     return np.sqrt(np.sum(x**2) / len(x))

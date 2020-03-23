@@ -30,7 +30,8 @@ class Dataset:
                               np.sin(self.raobs) * np.cos(self.decobs),
                               np.sin(self.decobs)]).T
         self.mask = np.ones(len(mjd), dtype="bool")
-
+        self.weight = np.ones(len(mjd), dtype="float")
+        
 class Observation:
     """Observation class"""
 

@@ -325,8 +325,12 @@ def find_tle_before(tles, satno, tfind):
     satnos = np.array([tle.satno for tle in tles])
     tepoch = Time([tle.epoch for tle in tles], format="datetime", scale="utc")
     c  = (satnos == satno) & (tepoch <= tfind + 0.01)
+    if np.sum(c) == 0:
+        return None
     tmax = np.max(tepoch[c])
     c = (satnos==satno) & (tepoch == tmax)
+    if np.sum(c) == 0:
+        return None
     for i, tle in enumerate(tles):
         if c[i]:
             return tle

@@ -27,6 +27,10 @@ def update_tle(satno, tlefile, datfile, observers, tend, length):
             observations = [decode_iod_observation(newline, observers) for newline in newlines]
             logging.info(f"{len(observations)} observations read for object {satno}")
 
+    # Return if no observations
+    if observations is None:
+        return
+            
     # Read TLE
     logging.info(f"Reading TLEs from {tlefile}")
     tles = read_tles_from_file(tlefile)
@@ -34,7 +38,7 @@ def update_tle(satno, tlefile, datfile, observers, tend, length):
         logging.info(f"Error reading {tlefile}")
         return
     logging.info(f"{len(tles)} TLEs read")
-
+    
     # Restructure observations
     logging.info("Converting observations")
     d = Dataset(observations)
@@ -57,12 +61,18 @@ def update_tle(satno, tlefile, datfile, observers, tend, length):
 
     # Select newest TLE before epoch
     tle = find_tle_before(tles, satno, tmax)
+    if tle is None:
+        logging.info(f"No suitable TLE found")
+        return
     tleage = tmax - Time(tle.epoch, scale="utc")
     logging.info(f"Latest tle ({tle.epochyr:02d}{tle.epochdoy:012.8f}) is {tleage.to(u.d).value:.4f} days old")
     if tleage <= 0.01:
         logging.info("No need to update TLE")
         return
 
+    # Compute weights
+    d.weight = (d.tobs - tmin) / (tmax - tmin)
+    
     # Propagate
     propepoch = tmax.datetime
     proptle, converged = propagate(tle, propepoch, drmin=1e-3, dvmin=1e-6, niter=100)
@@ -143,6 +153,11 @@ def update_tle(satno, tlefile, datfile, observers, tend, length):
     ax3.xaxis.set_minor_locator(AutoMinorLocator(5))
     ax4.yaxis.set_minor_locator(AutoMinorLocator(6))
     ax4.xaxis.set_minor_locator(AutoMinorLocator(5))
+
+    tmin = tmin - 1 * u.d
+    tmax = tmax + 1 * u.d
+    ax1.set_xlim(tmin.datetime, tmax.datetime)
+    ax2.set_xlim(tmin.datetime, tmax.datetime)
     
     ax1.grid()
     ax2.grid()
