@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
 import matplotlib.dates as mdates
 
-def update_tle(satno, tlefile, datfile, observers, tend, length):
+def update_tle(satno, tlefile, datfile, outfile, observers, tend, length):
     # Read observations
     observations = None
     if os.path.exists(datfile):
@@ -173,11 +173,7 @@ def update_tle(satno, tlefile, datfile, observers, tend, length):
     plt.close()
         
     # Store
-    with open(tlefile, "a+") as f:
+    with open(outfile, "a+") as f:
         f.write(f"{line0}\n{line1}\n{line2}\n")
         f.write(f"# {format_time_for_output(tmin)}-{format_time_for_output(tmax)}, {np.sum(d.mask)} measurements, {postfit_rms:.4f} deg rms\n")
 
-    with open("latest.txt", "a+") as f:
-        f.write(f"{line0}\n{line1}\n{line2}\n")
-        f.write(f"# {format_time_for_output(tmin)}-{format_time_for_output(tmax)}, {np.sum(d.mask)} measurements, {postfit_rms:.4f} deg rms\n")
-            

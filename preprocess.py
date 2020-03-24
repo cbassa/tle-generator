@@ -13,6 +13,9 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--catalog", type=str,
                         help="Input TLE catalog to update",
                         metavar="FILE")
+    parser.add_argument("-o", "--output", type=str,
+                        help="Output TLE catalog [default: output.txt]",
+                        metavar="FILE", default="output.txt")
     parser.add_argument("-d", "--data", type=str,
                         help="File with observations")
     parser.add_argument("-i", "--ident", type=int,
@@ -59,4 +62,4 @@ if __name__ == "__main__":
         tend = Time(args.endtime, format="isot", scale="utc")
  
     # Update TLE
-    update_tle(args.ident, args.catalog, args.data, observers, tend, args.length)
+    update_tle(args.ident, args.catalog, args.data, args.output, observers, tend, args.length)
