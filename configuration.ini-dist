@@ -1,7 +1,7 @@
 [Common]
-observations_path = /path/to/observations/ # Path to store imported observations
-observers_file = sites.txt                 # File with observer information
-identifiers_file = desig.txt               # File with satellite identifiers
+database_file = database.db      # Database filename
+observers_file = sites.txt       # File with observer information
+identifiers_file = desig.txt     # File with satellite identifiers
 
 [SpaceTrack]
 username = username               # Username at spacetrack.org

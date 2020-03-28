@@ -57,6 +57,10 @@ def parse_observations(lines, observers, identifiers):
         else:
             continue
 
+        # Skip bad observations
+        if o is None:
+            logger.debug(f"Discarding {line}")
+        
         # Append to list
         if o is not None:
             observations.append((o.satno, o.desig_year, o.desig_id, o.site_id, o.t.datetime, o.iod_line, o.obs_condition, o.st, o.sp, o.p.ra.deg, o.p.dec.deg, o.epoch, o.uk_line, o.rde_preamble, o.rde_date, o.rde_line))
@@ -173,7 +177,7 @@ if __name__ == "__main__":
         with conn:
             cur = conn.cursor()
             cur.executemany(db.sql_insert_observations, observations)
-            logger.info(f"Inserted {len(observations)} observations")
+            logger.info(f"Processed {len(observations)} observations")
 
     # Parse TLEs
     if args.catalog is not None:
@@ -187,4 +191,4 @@ if __name__ == "__main__":
         with conn:
             cur = conn.cursor()
             cur.executemany(db.sql_insert_elements, elements)
-            logger.info(f"Inserted {len(elements)} TLEs")
+            logger.info(f"Processed {len(elements)} TLEs")
