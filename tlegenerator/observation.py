@@ -35,7 +35,7 @@ class Dataset:
 class Observation:
     """Observation class"""
 
-    def __init__(self, satno, desig_year, desig_id, site_id, obs_condition, t, st, p, sp, angle_format, epoch, iod_line, observer):
+    def __init__(self, satno, desig_year, desig_id, site_id, obs_condition, t, st, p, sp, angle_format, epoch, iod_line, uk_line, rde_preamble, rde_date, rde_line, observer):
         self.satno = satno
         self.desig_year = desig_year
         self.desig_id = desig_id
@@ -48,6 +48,10 @@ class Observation:
         self.angle_format = angle_format
         self.epoch = epoch
         self.iod_line = iod_line.rstrip()
+        self.uk_line = uk_line.rstrip()
+        self.rde_preamble = rde_preamble.rstrip()
+        self.rde_date = rde_date
+        self.rde_line = rde_line.rstrip()
         self.observer = observer
 
     def __repr__(self):

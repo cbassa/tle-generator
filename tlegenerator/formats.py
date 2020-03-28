@@ -248,7 +248,7 @@ def decode_rde_observation(rde_preamble, rde_date, rde_line, observers, identifi
     iod_line = f"{satno:05d} {desig_year:02d} {desig_id:<6s} {site_id:04d} {obs_condition:1s} {iod_timestamp} {tm:1d}{tx:1d} 15 {pstr} {pm:1d}{px:1d}"
 
     # Format observation
-    o = Observation(satno, desig_year, desig_id, site_id, obs_condition, t, st, p, sp, angle_format, epoch, iod_line, observer)
+    o = Observation(satno, desig_year, desig_id, site_id, obs_condition, t, st, p, sp, angle_format, epoch, iod_line, "", rde_preamble, rde_date, rde_line, observer)
         
     return o
     
@@ -385,7 +385,7 @@ def decode_uk_observation(uk_line, observers, identifiers):
     iod_line = f"{satno:05d} {desig_year:02d} {desig_id:<6s} {site_id:04d} {obs_condition:1s} {iod_timestamp} {tm:1d}{tx:1d} 15 {pstr} {pm:1d}{px:1d}"
 
     # Format observation
-    o = Observation(satno, desig_year, desig_id, site_id, obs_condition, t, st, p, sp, angle_format, epoch, iod_line, observer)
+    o = Observation(satno, desig_year, desig_id, site_id, obs_condition, t, st, p, sp, angle_format, epoch, iod_line, uk_line, "", "", "", observer)
         
     return o
 
@@ -520,6 +520,6 @@ def decode_iod_observation(iod_line, observers):
         return None
     
     # Format observation
-    o = Observation(satno, desig_year, desig_id, site_id, obs_condition, t, st, p, sp, angle_format, epoch, iod_line, observer)
+    o = Observation(satno, desig_year, desig_id, site_id, obs_condition, t, st, p, sp, angle_format, epoch, iod_line, "", "", "", "", observer)
         
     return o
