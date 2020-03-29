@@ -226,7 +226,15 @@ def decode_rde_observation(rde_preamble, rde_date, rde_line, observers, identifi
         logging.debug(f"Site information missing for {site_id}")
         return None
 
-    # Encode time uncertainty
+    # Discard observations with bad time and position errors
+    if st == 0.0:
+        logging.debug("Error in time uncertainty")
+        return None
+    if sp == 0.0:
+        logging.debug("Error in position uncertainty")
+        return None
+    
+    # Encode time uncertainty       
     tx = int(np.floor(np.log10(st)) + 8)
     tm = int(np.floor(st * 10**(-(tx - 8))))
 
@@ -363,6 +371,14 @@ def decode_uk_observation(uk_line, observers, identifiers):
         logging.debug(f"Site information missing for {site_id}")
         return None
 
+    # Discard observations with bad time and position errors
+    if st == 0.0:
+        logging.debug("Error in time uncertainty")
+        return None
+    if sp == 0.0:
+        logging.debug("Error in position uncertainty")
+        return None
+
     # Encode time uncertainty
     tx = int(np.floor(np.log10(st)) + 8)
     tm = int(np.floor(st * 10**(-(tx - 8))))
@@ -428,10 +444,16 @@ def decode_iod_observation(iod_line, observers):
         angle_format, epoch = int(iod_line[44]), int(iod_line[45])
 
         # Discard bad epochs
-        if epoch!=5:
+#        if epoch!=5:
+#            logging.debug("Epoch not implemented")
+#            return None
+        if epoch==5:
+            frame = FK5
+        elif epoch==4:
+            frame = FK4
+        else:
             logging.debug("Epoch not implemented")
             return None
-
         # Parse positional error
         me, xe = int(iod_line[62]), int(iod_line[63])
         sp = me * 10**(xe - 8)
@@ -445,9 +467,9 @@ def decode_iod_observation(iod_line, observers):
             try:
                 ra = decode_HHMMSSs(angle1)
                 dec = decode_DDMMSS(angle2)
-                p = SkyCoord(ra=ra, dec=dec, frame=FK5)
+                p = SkyCoord(ra=ra, dec=dec, frame=frame)
             except:
-                logging.debug("Failed to decode position")
+                logging.debug(f"Failed to decode position (format {angle_format})")
                 p = None
             sp = sp / 3600
         elif angle_format == 2:
@@ -455,9 +477,9 @@ def decode_iod_observation(iod_line, observers):
             try:
                 ra = decode_HHMMmmm(angle1)
                 dec = decode_DDMMmm(angle2)
-                p = SkyCoord(ra=ra, dec=dec, frame=FK5)
+                p = SkyCoord(ra=ra, dec=dec, frame=frame)
             except:
-                logging.debug("Failed to decode position")
+                logging.debug(f"Failed to decode position (format {angle_format})")
                 p = None
             sp = sp / 60
         elif angle_format == 3:
@@ -465,9 +487,9 @@ def decode_iod_observation(iod_line, observers):
             try:
                 ra = decode_HHMMmmm(angle1)
                 dec = decode_DDdddd(angle2)
-                p = SkyCoord(ra=ra, dec=dec, frame=FK5)
+                p = SkyCoord(ra=ra, dec=dec, frame=frame)
             except:
-                logging.debug("Failed to decode position")
+                logging.debug(f"Failed to decode position (format {angle_format})")
                 p = None
         elif angle_format == 4:
             logging.debug("Format not implemented")
@@ -494,9 +516,9 @@ def decode_iod_observation(iod_line, observers):
             try:
                 ra = decode_HHMMSSs(angle1)
                 dec = decode_DDdddd(angle2)
-                p = SkyCoord(ra=ra, dec=dec, frame=FK5)
+                p = SkyCoord(ra=ra, dec=dec, frame=frame)
             except:
-                logging.debug("Failed to decode position")
+                logging.debug(f"Failed to decode position (format {angle_format})")
                 p = None
         else:
             logging.debug("Format not defined")
@@ -507,6 +529,14 @@ def decode_iod_observation(iod_line, observers):
         logging.debug(str(w[-1].message))
         return None
 
+    # Discard observations without valid positions
+    if p == None:
+        return None
+
+    # Propagate of FK5
+    if epoch == 4:
+        p = p.transform_to(FK5)
+    
     # Find observer
     found = False
     for observer in observers:

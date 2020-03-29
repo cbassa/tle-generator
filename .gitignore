@@ -104,5 +104,4 @@ venv.bak/
 .mypy_cache/
 
 configuration.ini
-observations/
-elements/
+*~

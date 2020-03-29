@@ -4,7 +4,6 @@ import sys
 import argparse
 import logging
 import configparser
-from pathlib import Path
 
 from tlegenerator import database as db
 from tlegenerator import formats as fmt
@@ -29,12 +28,18 @@ def parse_observations(lines, observers, identifiers):
         # Check if this line is an observation in the IOD format
         if fmt.is_iod_observation(line):
             # Decode IOD observation
-            o = fmt.decode_iod_observation(line, observers)
-        # Check if this line is an observation in the UK format
+            try:
+                o = fmt.decode_iod_observation(line, observers)
+            except:
+                o = None
+            # Check if this line is an observation in the UK format
         elif fmt.is_uk_observation(line):
             # Decode UK observation
-            o = fmt.decode_uk_observation(line, observers, identifiers)
-        # Check if this line is a preamble to an observation in the RDE format
+            try:
+                o = fmt.decode_uk_observation(line, observers, identifiers)
+            except:
+                o = None
+            # Check if this line is a preamble to an observation in the RDE format
         elif fmt.is_rde_preamble(line):
             is_rde = True
             rde_preamble = line
@@ -47,7 +52,10 @@ def parse_observations(lines, observers, identifiers):
             continue
         # Check if this line is an observation in the RDE format
         elif fmt.is_rde_observation(line) and is_rde and has_rde_date:
-            o = fmt.decode_rde_observation(rde_preamble, rde_date, line, observers, identifiers)
+            try:
+                o = fmt.decode_rde_observation(rde_preamble, rde_date, line, observers, identifiers)
+            except:
+                o = None
         # Check if this line signals the end of an RDE observation report
         elif fmt.is_rde_end(line) and is_rde:
             is_rde = False
