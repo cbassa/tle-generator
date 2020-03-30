@@ -149,9 +149,8 @@ if __name__ == "__main__":
 
     # Read configuration file
     cfg = configparser.ConfigParser(inline_comment_prefixes=("#", ";"))
-    conf_file = args.conf_file
-    cfg.read(conf_file)
-    logger.info(f"Using config: {conf_file}")
+    cfg.read(args.conf_file)
+    logger.info(f"Using config: {args.conf_file}")
 
     # Create database connection
     conn = db.create_connection(cfg.get("Common", "database_file"))
