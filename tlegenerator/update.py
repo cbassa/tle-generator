@@ -119,11 +119,7 @@ def update_tle(observations, tle, tmin, tmax):
     ax4.set_ylabel(r"Angular offset ($^\circ$)")
     ax1.legend(ncol=len(uniq_sites), loc="upper center")
     plt.tight_layout()
-    plt.savefig(f"{newtle.satno:05d}_{tstr}_postfit.png", bbox_inches="tight")
+    plt.savefig(f"results/{newtle.satno:05d}_{tstr}_postfit.png", bbox_inches="tight")
     plt.close()
         
-    # Store
-    #with open(outfile, "a+") as f:
-    #    f.write(f"{line0}\n{line1}\n{line2}\n")
-    #    f.write(f"# {format_time_for_output(tmin)}-{format_time_for_output(tmax)}, {np.sum(d.mask)} measurements, {postfit_rms:.4f} deg rms\n")
-
+    return newtle

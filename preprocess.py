@@ -4,6 +4,7 @@ import sys
 import argparse
 import configparser
 import logging
+import yaml
 
 import astropy.units as u
 from astropy.time import Time
@@ -95,6 +96,10 @@ if __name__ == "__main__":
     rows = cur.fetchall()
     logger.info(f"Selected {len(rows)} observations of {satno} between {tmin.isot} and {tmax.isot}")
 
+    # Exit if no observations
+    if len(rows) == 0:
+        sys.exit()
+    
     # Store observations
     observations = [fmt.decode_iod_observation(row[0], observers) for row in rows]
 
@@ -107,6 +112,21 @@ if __name__ == "__main__":
     row = rows[0]
     tle = twoline.TwoLineElement(row[0], row[1], row[2])
     
+    # Store yaml
+    data = {"prefit": {"line0": tle.line0,
+                       "line1": tle.line1,
+                       "line2": tle.line2},
+            "observations": [o.iod_line for o in observations]}
     
-    # Update TLE
-    update.update_tle(observations, tle, tmin, tmax)
+    with open(f"results/{tle.satno:05d}.yaml", "w") as fp:
+        yaml.dump(data, fp, sort_keys=True)
+
+    # Store TLE
+    with open(f"results/{tle.satno:05d}.txt", "w") as f:
+        f.write(f"{tle.line0}\n{tle.line1}\n{tle.line2}\n")
+
+    # Store data
+    with open(f"results/{tle.satno:05d}.dat", "w") as f:
+        for o in observations:
+            f.write(f"{o.iod_line}\n")
+        
