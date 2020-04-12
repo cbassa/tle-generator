@@ -80,7 +80,7 @@ if __name__ == "__main__":
 
     # Select last observation before end time
     cur = conn.cursor()
-    cur.execute("SELECT MAX(date) FROM observations WHERE date < ? AND satno = ?", (tend.datetime, satno))
+    cur.execute("SELECT MAX(date) FROM observations WHERE date <= ? AND satno = ?", (tend.datetime, satno))
     row = cur.fetchall()[0]
 
     # Set time range
@@ -92,7 +92,7 @@ if __name__ == "__main__":
         tmin = tmax - args.length * u.d
 
     # Select observations in time range
-    cur.execute("SELECT iod_line FROM observations WHERE date > ? AND date < ? AND satno = ? ORDER BY date", (tmin.datetime, tmax.datetime, satno))
+    cur.execute("SELECT iod_line FROM observations WHERE date > ? AND date <= ? AND satno = ? ORDER BY date", (tmin.datetime, tmax.datetime, satno))
     rows = cur.fetchall()
     logger.info(f"Selected {len(rows)} observations of {satno} between {tmin.isot} and {tmax.isot}")
 
@@ -113,9 +113,9 @@ if __name__ == "__main__":
     tle = twoline.TwoLineElement(row[0], row[1], row[2])
     
     # Store yaml
-    data = {"prefit": {"line0": tle.line0,
-                       "line1": tle.line1,
-                       "line2": tle.line2},
+    data = {"tle": {"line0": tle.line0,
+                    "line1": tle.line1,
+                    "line2": tle.line2},
             "observations": [o.iod_line for o in observations]}
     
     with open(f"results/{tle.satno:05d}.yaml", "w") as fp:

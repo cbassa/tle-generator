@@ -64,7 +64,7 @@ if __name__ == "__main__":
         data = yaml.load(fp, Loader=yaml.FullLoader)
 
     # Extract TLE
-    tle = twoline.TwoLineElement(*list(data["prefit"].values()))
+    tle = twoline.TwoLineElement(*list(data["tle"].values()))
 
     # Extract observations
     observations = [fmt.decode_iod_observation(line, observers) for line in data["observations"]]
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(10, 8))
 
     uniq_sites = np.unique(sites)
-    sequence = np.arange(len(dt))
+    sequence = np.arange(len(dt)) + 1
     for site in uniq_sites:
         c = site == sites
         ax1.errorbar(tobs[c].datetime, dt[c], yerr=terr[c], fmt=".", label=f"{site:d}")
@@ -111,10 +111,13 @@ if __name__ == "__main__":
         ax4.errorbar(sequence[c], dr[c], yerr=perr[c], fmt=".", label=f"{site:d}")
 
     #ax1.set_title(f"{tle.name} [{tle.satno}/{tle.desig}]: {tle.epochyr:02d}{tle.epochdoy:012.8f}, {np.sum(d.mask)} measurements, {rms(dt):.4f} sec, {rms(dr):.4f} deg rms", loc="left")
-    ax1.set_title(f"{tle.line0}\n{tle.line1}\n{tle.line2}\n# {optimize.format_time_for_output(tmin)}-{optimize.format_time_for_output(tmax)}, {np.sum(d.mask)} obs, {optimize.rms(dt):.4f} sec, {optimize.rms(dr):.4f} deg rms\n", loc="left", family="monospace")
+    ax1.set_title(f"{tle.line0}\n{tle.line1}\n{tle.line2}\n# {optimize.format_time_for_output(np.min(d.tobs[d.mask]))}-{optimize.format_time_for_output(np.max(d.tobs[d.mask]))}, {np.sum(d.mask)} obs, {optimize.rms(dt):.4f} sec, {optimize.rms(dr):.4f} deg rms\n", loc="left", family="monospace")
 
-    print(prefit_rms)
-    
+    # Plot epoch
+    ax1.axvline(tle.epoch, color="k", linestyle=":")
+    ax2.axvline(tle.epoch, color="k", linestyle=":")
+
+    # Set
     ax1.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
     ax1.xaxis.set_major_locator(mdates.AutoDateLocator())
     ax1.xaxis.set_minor_locator(AutoMinorLocator())
@@ -155,6 +158,6 @@ if __name__ == "__main__":
     ax4.set_ylabel(r"Angular offset ($^\circ$)")
     ax1.legend(ncol=len(uniq_sites), loc="upper center")
     plt.tight_layout()
-    #plt.savefig(f"results/{tle.satno:05d}_{tstr}_postfit.png", bbox_inches="tight")
-    plt.show()
+    plt.savefig(f"results/{tle.satno:05d}_{tstr}.png", bbox_inches="tight")
+    #plt.show()
     plt.close()

@@ -9,7 +9,7 @@ import astropy.units as u
 from tlegenerator.observation import Observation
            
 def is_iod_observation(line):
-    pattern = r"\d{5} \d{2} \d{3}... \d{4} . \d{17} \d{2} \d{2} \d{7}.\d{6} \d{2}"
+    pattern = r"\d{5} \d{2} \d{3}... \d{4} . \d{14}... \d{2} \d{2} \d{7}.\d{6} \d{2}"
 
     if re.match(pattern, line) is not None:
         return True
