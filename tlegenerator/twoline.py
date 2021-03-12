@@ -27,6 +27,8 @@ class TwoLineElement:
         self.satno = int(line1[2:7])
         self.classification = line1[7]
         self.desig = line1[9:17].rstrip()
+        self.desig_year = line1[9:11]
+        self.desig_id = line1[11:17].rstrip()
         self.epochyr = int(line1[18:20])
         self.epochdoy = float(line1[20:32])
         self.ndot = float(line1[33:43])

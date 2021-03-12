@@ -9,7 +9,7 @@ import astropy.units as u
 from tlegenerator.observation import Observation
            
 def is_iod_observation(line):
-    pattern = r"\d{5} \d{2} \d{3}... \d{4} . \d{17} \d{2} \d{2} \d{7}.\d{6} \d{2}"
+    pattern = r"\d{5} \d{2} \d{3}... \d{4} . \d{14}... \d{2} \d{2} \d{7}.\d{6} \d{2}"
 
     if re.match(pattern, line) is not None:
         return True
@@ -226,7 +226,15 @@ def decode_rde_observation(rde_preamble, rde_date, rde_line, observers, identifi
         logging.debug(f"Site information missing for {site_id}")
         return None
 
-    # Encode time uncertainty
+    # Discard observations with bad time and position errors
+    if st == 0.0:
+        logging.debug("Error in time uncertainty")
+        return None
+    if sp == 0.0:
+        logging.debug("Error in position uncertainty")
+        return None
+    
+    # Encode time uncertainty       
     tx = int(np.floor(np.log10(st)) + 8)
     tm = int(np.floor(st * 10**(-(tx - 8))))
 
@@ -248,7 +256,7 @@ def decode_rde_observation(rde_preamble, rde_date, rde_line, observers, identifi
     iod_line = f"{satno:05d} {desig_year:02d} {desig_id:<6s} {site_id:04d} {obs_condition:1s} {iod_timestamp} {tm:1d}{tx:1d} 15 {pstr} {pm:1d}{px:1d}"
 
     # Format observation
-    o = Observation(satno, desig_year, desig_id, site_id, obs_condition, t, st, p, sp, angle_format, epoch, iod_line, observer)
+    o = Observation(satno, desig_year, desig_id, site_id, obs_condition, t, st, p, sp, angle_format, epoch, iod_line, "", rde_preamble, rde_date, rde_line, observer)
         
     return o
     
@@ -363,6 +371,14 @@ def decode_uk_observation(uk_line, observers, identifiers):
         logging.debug(f"Site information missing for {site_id}")
         return None
 
+    # Discard observations with bad time and position errors
+    if st == 0.0:
+        logging.debug("Error in time uncertainty")
+        return None
+    if sp == 0.0:
+        logging.debug("Error in position uncertainty")
+        return None
+
     # Encode time uncertainty
     tx = int(np.floor(np.log10(st)) + 8)
     tm = int(np.floor(st * 10**(-(tx - 8))))
@@ -385,7 +401,7 @@ def decode_uk_observation(uk_line, observers, identifiers):
     iod_line = f"{satno:05d} {desig_year:02d} {desig_id:<6s} {site_id:04d} {obs_condition:1s} {iod_timestamp} {tm:1d}{tx:1d} 15 {pstr} {pm:1d}{px:1d}"
 
     # Format observation
-    o = Observation(satno, desig_year, desig_id, site_id, obs_condition, t, st, p, sp, angle_format, epoch, iod_line, observer)
+    o = Observation(satno, desig_year, desig_id, site_id, obs_condition, t, st, p, sp, angle_format, epoch, iod_line, uk_line, "", "", "", observer)
         
     return o
 
@@ -428,16 +444,22 @@ def decode_iod_observation(iod_line, observers):
         angle_format, epoch = int(iod_line[44]), int(iod_line[45])
 
         # Discard bad epochs
-        if epoch!=5:
+#        if epoch!=5:
+#            logging.debug("Epoch not implemented")
+#            return None
+        if epoch==5:
+            frame = FK5
+        elif epoch==4:
+            frame = FK4
+        else:
             logging.debug("Epoch not implemented")
             return None
-
         # Parse positional error
         me, xe = int(iod_line[62]), int(iod_line[63])
         sp = me * 10**(xe - 8)
 
         # Decode angles
-        p = None
+        decode_angle = False
         angle1 = iod_line[47:54]
         angle2 = iod_line[54:61]
         if angle_format == 1:
@@ -445,30 +467,30 @@ def decode_iod_observation(iod_line, observers):
             try:
                 ra = decode_HHMMSSs(angle1)
                 dec = decode_DDMMSS(angle2)
-                p = SkyCoord(ra=ra, dec=dec, frame=FK5)
+                p = SkyCoord(ra=ra, dec=dec, frame=frame)
+                decode_angle = True
             except:
-                logging.debug("Failed to decode position")
-                p = None
+                logging.debug(f"Failed to decode position (format {angle_format})")
             sp = sp / 3600
         elif angle_format == 2:
             # Format 2: RA/DEC = HHMMmmm+DDMMmm MX   (MX in minutes of arc)
             try:
                 ra = decode_HHMMmmm(angle1)
                 dec = decode_DDMMmm(angle2)
-                p = SkyCoord(ra=ra, dec=dec, frame=FK5)
+                p = SkyCoord(ra=ra, dec=dec, frame=frame)
+                decode_angle = True                
             except:
-                logging.debug("Failed to decode position")
-                p = None
+                logging.debug(f"Failed to decode position (format {angle_format})")
             sp = sp / 60
         elif angle_format == 3:
             # Format 3: RA/DEC = HHMMmmm+DDdddd MX   (MX in degrees of arc)
             try:
                 ra = decode_HHMMmmm(angle1)
                 dec = decode_DDdddd(angle2)
-                p = SkyCoord(ra=ra, dec=dec, frame=FK5)
+                p = SkyCoord(ra=ra, dec=dec, frame=frame)
+                decode_angle = True                
             except:
-                logging.debug("Failed to decode position")
-                p = None
+                logging.debug(f"Failed to decode position (format {angle_format})")
         elif angle_format == 4:
             logging.debug("Format not implemented")
             # Format 4: AZ/EL  = DDDMMSS+DDMMSS MX   (MX in seconds of arc)
@@ -494,9 +516,10 @@ def decode_iod_observation(iod_line, observers):
             try:
                 ra = decode_HHMMSSs(angle1)
                 dec = decode_DDdddd(angle2)
-                p = SkyCoord(ra=ra, dec=dec, frame=FK5)
+                p = SkyCoord(ra=ra, dec=dec, frame=frame)
+                decode_angle = True
             except:
-                logging.debug("Failed to decode position")
+                logging.debug(f"Failed to decode position (format {angle_format})")
                 p = None
         else:
             logging.debug("Format not defined")
@@ -507,19 +530,28 @@ def decode_iod_observation(iod_line, observers):
         logging.debug(str(w[-1].message))
         return None
 
+    # Discard observations without valid positions
+    if not decode_angle:
+        logging.debug(f"No valid position parsed")
+        return None
+
+    # Propagate of FK5
+    if epoch == 4:
+        p = p.transform_to(FK5)
+    
     # Find observer
     found = False
     for observer in observers:
         if observer.site_id == site_id:
             found = True
             break
-
+        
     # Discard observations with missing site information
     if not found:
         logging.debug(f"Site information missing for {site_id}")
         return None
-    
+
     # Format observation
-    o = Observation(satno, desig_year, desig_id, site_id, obs_condition, t, st, p, sp, angle_format, epoch, iod_line, observer)
+    o = Observation(satno, desig_year, desig_id, site_id, obs_condition, t, st, p, sp, angle_format, epoch, iod_line, "", "", "", "", observer)
         
     return o

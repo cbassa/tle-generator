@@ -15,60 +15,10 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
 import matplotlib.dates as mdates
 
-def update_tle(satno, tlefile, datfile, outfile, observers, tend, length):
-    # Read observations
-    observations = None
-    if os.path.exists(datfile):
-        logging.info(f"Reading observations from {datfile}")
-        with open(datfile, errors="replace") as f:
-            newlines = f.readlines()
-            
-            # Parse observations
-            observations = [decode_iod_observation(newline, observers) for newline in newlines]
-            logging.info(f"{len(observations)} observations read for object {satno}")
-
-    # Return if no observations
-    if observations is None:
-        return
-            
-    # Read TLE
-    logging.info(f"Reading TLEs from {tlefile}")
-    tles = read_tles_from_file(tlefile)
-    if tles is None:
-        logging.info(f"Error reading {tlefile}")
-        return
-    logging.info(f"{len(tles)} TLEs read")
-    
+def update_tle(observations, tle, tmin, tmax):
     # Restructure observations
     logging.info("Converting observations")
     d = Dataset(observations)
-
-    # Find last observation
-    if tend is None:
-        tend = np.max(d.tobs)
-    logging.info(f"Selecting observations before {tend.isot}")
-    c = d.tobs <= tend
-    if np.sum(c) == 0:
-        logging.info(f"No observations selected")
-        return
-
-    # Select observations
-    tmax = np.max(d.tobs[c])
-    tmin = tmax - length * u.d
-    d.mask = (d.tobs > tmin) & (d.tobs <= tmax)
-    logging.info(f"Last observation obtained at {tmax.isot}")
-    logging.info(f"{np.sum(d.mask)} observations selected")
-
-    # Select newest TLE before epoch
-    tle = find_tle_before(tles, satno, tmax)
-    if tle is None:
-        logging.info(f"No suitable TLE found")
-        return
-    tleage = tmax - Time(tle.epoch, scale="utc")
-    logging.info(f"Latest tle ({tle.epochyr:02d}{tle.epochdoy:012.8f}) is {tleage.to(u.d).value:.4f} days old")
-    if tleage <= 0.01:
-        logging.info("No need to update TLE")
-        return
 
     # Compute weights
     d.weight = (d.tobs - tmin) / (tmax - tmin)
@@ -126,15 +76,22 @@ def update_tle(satno, tlefile, datfile, outfile, observers, tend, length):
         ax3.errorbar(sequence[c], dt[c], yerr=terr[c], fmt=".", label=f"{site:d}")
         ax4.errorbar(sequence[c], dr[c], yerr=perr[c], fmt=".", label=f"{site:d}")
 
-    ax1.set_title(f"{newtle.name} [{newtle.satno}/{newtle.desig}]: {newtle.epochyr:02d}{newtle.epochdoy:012.8f}, {np.sum(d.mask)} measurements, {rms(dt):.4f} sec, {rms(dr):.4f} deg rms", loc="left")
-        
+    #ax1.set_title(f"{newtle.name} [{newtle.satno}/{newtle.desig}]: {newtle.epochyr:02d}{newtle.epochdoy:012.8f}, {np.sum(d.mask)} measurements, {rms(dt):.4f} sec, {rms(dr):.4f} deg rms", loc="left")
+    ax1.set_title(f"{newtle.line0}\n{newtle.line1}\n{newtle.line2}\n# {format_time_for_output(tmin)}-{format_time_for_output(tmax)}, {np.sum(d.mask)} obs, {rms(dt):.4f} sec, {rms(dr):.4f} deg rms\n", loc="left", family="monospace")
+
     ax1.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
-    ax1.xaxis.set_major_locator(mdates.WeekdayLocator())
-    ax1.xaxis.set_minor_locator(AutoMinorLocator(7))
+    ax1.xaxis.set_major_locator(mdates.AutoDateLocator())
+    ax1.xaxis.set_minor_locator(AutoMinorLocator())
     ax2.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m-%d"))
-    ax2.xaxis.set_major_locator(mdates.WeekdayLocator())
-    ax2.xaxis.set_minor_locator(AutoMinorLocator(7))
-        
+    ax2.xaxis.set_major_locator(mdates.AutoDateLocator())
+    ax2.xaxis.set_minor_locator(AutoMinorLocator())
+    ax1.yaxis.set_minor_locator(AutoMinorLocator())
+    ax2.yaxis.set_minor_locator(AutoMinorLocator())
+    ax3.yaxis.set_minor_locator(AutoMinorLocator())
+    ax3.xaxis.set_minor_locator(AutoMinorLocator())
+    ax4.yaxis.set_minor_locator(AutoMinorLocator())
+    ax4.xaxis.set_minor_locator(AutoMinorLocator())
+    
     dtmax, drmax = np.max(np.abs(dt)), np.max(np.abs(dr))
     ax1.set_ylim(-1.5 * dtmax, 3 * dtmax)
     ax2.set_ylim(-1.5 * drmax, 1.5 * drmax)
@@ -147,13 +104,6 @@ def update_tle(satno, tlefile, datfile, outfile, observers, tend, length):
     ax3.set_xlabel("Sequence")
     ax4.set_xlabel("Sequence")
         
-    ax1.yaxis.set_minor_locator(AutoMinorLocator(5))
-    ax2.yaxis.set_minor_locator(AutoMinorLocator(6))
-    ax3.yaxis.set_minor_locator(AutoMinorLocator(5))
-    ax3.xaxis.set_minor_locator(AutoMinorLocator(5))
-    ax4.yaxis.set_minor_locator(AutoMinorLocator(6))
-    ax4.xaxis.set_minor_locator(AutoMinorLocator(5))
-
     tmin = tmin - 1 * u.d
     tmax = tmax + 1 * u.d
     ax1.set_xlim(tmin.datetime, tmax.datetime)
@@ -169,11 +119,7 @@ def update_tle(satno, tlefile, datfile, outfile, observers, tend, length):
     ax4.set_ylabel(r"Angular offset ($^\circ$)")
     ax1.legend(ncol=len(uniq_sites), loc="upper center")
     plt.tight_layout()
-    plt.savefig(f"{newtle.satno:05d}_{tstr}_postfit.png", bbox_inches="tight")
+    plt.savefig(f"results/{newtle.satno:05d}_{tstr}_postfit.png", bbox_inches="tight")
     plt.close()
         
-    # Store
-    with open(outfile, "a+") as f:
-        f.write(f"{line0}\n{line1}\n{line2}\n")
-        f.write(f"# {format_time_for_output(tmin)}-{format_time_for_output(tmax)}, {np.sum(d.mask)} measurements, {postfit_rms:.4f} deg rms\n")
-
+    return newtle

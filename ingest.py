@@ -4,112 +4,124 @@ import sys
 import argparse
 import logging
 import configparser
-from pathlib import Path
 
-from tlegenerator.formats import is_iod_observation, decode_iod_observation
-from tlegenerator.formats import is_uk_observation, decode_uk_observation
-from tlegenerator.formats import is_rde_preamble, is_rde_date, is_rde_end
-from tlegenerator.formats import is_rde_observation, decode_rde_observation
+from tlegenerator import database as db
+from tlegenerator import formats as fmt
+from tlegenerator import observation as obs
+from tlegenerator import twoline
 
-from tlegenerator.formats import read_identifiers
-from tlegenerator.observation import read_observers
-
-def ingest_observations(observations_path, newlines, observers, identifiers):
-    '''
+def parse_observations(lines, observers, identifiers):
+    """
     Reads a list of observation strings and writes them into the common file structure.
-    '''
+    """
 
     # Set up values for RDE format
     is_rde = False
     has_rde_date = False
     
     # Loop over lines
-    for newline in newlines:
+    observations = []
+    for line in lines:
         # Clean line
-        newline = newline.replace("\xa0", " ").rstrip()
+        line = line.replace("\xa0", " ").rstrip()
 
         # Check if this line is an observation in the IOD format
-        if is_iod_observation(newline):
+        if fmt.is_iod_observation(line):
             # Decode IOD observation
-            o = decode_iod_observation(newline, observers)
-        # Check if this line is an observation in the UK format
-        elif is_uk_observation(newline):
+            try:
+                o = fmt.decode_iod_observation(line, observers)
+            except:
+                o = None
+            # Check if this line is an observation in the UK format
+        elif fmt.is_uk_observation(line):
             # Decode UK observation
-            o = decode_uk_observation(newline, observers, identifiers)
-            if o is not None:
-                o = decode_iod_observation(o.iod_line, observers)
-        # Check if this line is a preamble to an observation in the RDE format
-        elif is_rde_preamble(newline):
+            try:
+                o = fmt.decode_uk_observation(line, observers, identifiers)
+            except:
+                o = None
+            # Check if this line is a preamble to an observation in the RDE format
+        elif fmt.is_rde_preamble(line):
             is_rde = True
-            rde_preamble = newline
+            rde_preamble = line
             rde_date = None
             continue
         # Check if this line is the date of an observation in the RDE format
-        elif is_rde_date(newline) and is_rde:
-            rde_date = int(newline)
+        elif fmt.is_rde_date(line) and is_rde:
+            rde_date = int(line)
             has_rde_date = True
             continue
         # Check if this line is an observation in the RDE format
-        elif is_rde_observation(newline) and is_rde and has_rde_date:
-            o = decode_rde_observation(rde_preamble, rde_date, newline, observers, identifiers)
-            if o is not None:
-                o = decode_iod_observation(o.iod_line, observers)            
+        elif fmt.is_rde_observation(line) and is_rde and has_rde_date:
+            try:
+                o = fmt.decode_rde_observation(rde_preamble, rde_date, line, observers, identifiers)
+            except:
+                o = None
         # Check if this line signals the end of an RDE observation report
-        elif is_rde_end(newline) and is_rde:
+        elif fmt.is_rde_end(line) and is_rde:
             is_rde = False
             has_rde_date = False
             continue
         # Skip otherwise
         else:
             continue
-            
+
         # Skip bad observations
         if o is None:
-            logger.debug(f"Discarding {newline}")
+            logger.debug(f"Discarding {line}")
+        
+        # Append to list
+        if o is not None:
+            observations.append((o.satno, o.desig_year, o.desig_id, o.site_id, o.t.datetime, o.iod_line, o.obs_condition, o.st, o.sp, o.p.ra.deg, o.p.dec.deg, o.epoch, o.uk_line, o.rde_preamble, o.rde_date, o.rde_line))
 
-            fname = Path(observations_path, "rejected.dat")
-            iod_line = newline
-        else:
-            fname = Path(observations_path, f"{o.satno:05d}.dat")
-            iod_line = o.iod_line
+    return observations
 
-        # Read existing observations
-        oldlines = []
-        if fname.exists():
-            with open(fname, "r") as f:
-                oldlines = f.readlines()
-                # NOTE: This might take a considerable amount of RAM
-                # if there are many obs as it reads all previous observations.
+def parse_elements(lines, origin=None):
+    # Loop over line
+    elements = []
+    for i in range(1, len(lines)):
+        if (lines[i][0]=="2") and (lines[i-1][0]=="1"):
+            tle = twoline.TwoLineElement(lines[i-2], lines[i-1], lines[i])
 
-        # Strip oldlines
-        oldlines = [line.rstrip() for line in oldlines]
-                
-        # Append if no duplicate
-        if not iod_line in oldlines:
-            oldlines.append(iod_line)
-                
-        # Lines to write
-        with open(fname, "w") as f:
-            for line in oldlines:
-                f.write(f"{line}\n")
-
+            elements.append((tle.satno,
+                             tle.desig_year,
+                             tle.desig_id,
+                             tle.name,
+                             tle.line0,
+                             tle.line1,
+                             tle.line2,
+                             tle.epoch,
+                             tle.epochyr,
+                             tle.epochdoy,
+                             tle.classification,
+                             tle.ndot,
+                             tle.nddot,
+                             tle.ephtype,
+                             tle.elnum,
+                             tle.incl,
+                             tle.node,
+                             tle.ecc,
+                             tle.argp,
+                             tle.m,
+                             tle.n,
+                             tle.revnum,
+                             origin))
+    return elements
+ 
 
 if __name__ == "__main__":
     # Read command line arguments
-    parser = argparse.ArgumentParser(description='Import observations file into the common file structure.')
-    parser.add_argument('-c', '--conf_file',
-                        help="Specify configuration file. If no file" +
-                        " is specified 'configuration.ini' is used.",
+    parser = argparse.ArgumentParser(description="Import observations file into the common file structure.")
+    parser.add_argument("-d", "--data", type=str,
+                        help="Observations to ingest",
                         metavar="FILE")
-    parser.add_argument('OBSERVATIONS_FILE', type=str,
-                        help='File with observations in IOD format')
+    parser.add_argument("-c", "--catalog", type=str,
+                        help="TLE catalog to ingest",
+                        metavar="FILE")
+    parser.add_argument("-C", "--conf_file",
+                        help="Specify configuration file. [default: configuration.ini]",
+                        metavar="FILE", default="configuration.ini")
     args = parser.parse_args()
-
-    # Read configuration file
-    cfg = configparser.ConfigParser(inline_comment_prefixes=('#', ';'))
-    conf_file = args.conf_file if args.conf_file else "configuration.ini"
-    cfg.read(conf_file)
-
+    
     # Set up logging
     logFormatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] " +
                                      "[%(levelname)-5.5s]  %(message)s")
@@ -121,22 +133,69 @@ if __name__ == "__main__":
     logger.addHandler(consoleHandler)
     logger.setLevel(logging.DEBUG)
 
-    logger.info(f"Using config: {conf_file}")
+    # Input checking
+    if not os.path.exists(args.conf_file):
+        logger.error(f"{args.conf_file} not found")
+        sys.exit()
+    if args.data is None and args.catalog is None:
+        parser.print_help()
+        sys.exit()
+    if args.data is not None and not os.path.exists(args.data):
+        logger.error(f"{args.data} not found")
+        sys.exit()
+    if args.catalog is not None and not os.path.exists(args.catalog):
+        logger.error(f"{args.catalog} not found")
+        sys.exit()
 
-    # Read observers
-    logger.info(f"Reading observers from {cfg.get('Common', 'observers_file')}")
-    observers = read_observers(cfg.get('Common', 'observers_file'))
+    # Read configuration file
+    cfg = configparser.ConfigParser(inline_comment_prefixes=("#", ";"))
+    cfg.read(args.conf_file)
+    logger.info(f"Using config: {args.conf_file}")
 
-    # Read identifiers
-    logger.info(f"Reading observers from {cfg.get('Common', 'identifiers_file')}")
-    identifiers = read_identifiers(cfg.get('Common', 'identifiers_file'))
-    
-    # Generate directory
-    if not os.path.exists(cfg.get('Common', 'observations_path')):
-        os.makedirs(cfg.get('Common', 'observations_path'))
-    
+    # Create database connection
+    conn = db.create_connection(cfg.get("Common", "database_file"))
+
+    # create tables
+    if conn is not None:
+        # Create tables
+        db.create_table(conn, db.sql_create_observations_table)
+        db.create_table(conn, db.sql_create_elements_table)
+    else:
+        logging.error("Cannot create the database connection.")
+        sys.exit()
+
     # Parse observations
-    logger.info(f"Parsing {args.OBSERVATIONS_FILE}")
-    with open(args.OBSERVATIONS_FILE, errors="replace") as f:
-        newlines = f.readlines()
-        ingest_observations(cfg.get('Common', 'observations_path'), newlines, observers, identifiers)
+    if args.data is not None:
+        # Read observers
+        logger.info(f"Reading observers from {cfg.get('Common', 'observers_file')}")
+        observers = obs.read_observers(cfg.get("Common", "observers_file"))
+
+        # Read identifiers
+        logger.info(f"Reading observers from {cfg.get('Common', 'identifiers_file')}")
+        identifiers = fmt.read_identifiers(cfg.get("Common", "identifiers_file"))
+    
+        # Parsing observations
+        logger.info(f"Parsing {args.data}")
+        with open(args.data, errors="replace") as f:
+            lines = f.readlines()
+            observations = parse_observations(lines, observers, identifiers)
+
+        # Insert into database
+        with conn:
+            cur = conn.cursor()
+            cur.executemany(db.sql_insert_observations, observations)
+            logger.info(f"Processed {len(observations)} observations")
+
+    # Parse TLEs
+    if args.catalog is not None:
+        # Parsing TLEs
+        logger.info(f"Parsing {args.catalog}")
+        with open(args.catalog, errors="replace") as f:
+            lines = f.readlines()
+            elements = parse_elements(lines)
+
+        # Insert into database
+        with conn:
+            cur = conn.cursor()
+            cur.executemany(db.sql_insert_elements, elements)
+            logger.info(f"Processed {len(elements)} TLEs")
