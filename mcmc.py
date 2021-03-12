@@ -97,8 +97,8 @@ if __name__ == "__main__":
     fig, axes = plt.subplots(ndim, figsize=(10, 7), sharex=True)
     samples = sampler.get_chain()
     # Keep in range
-    for i in [1, 3, 4]:
-        samples[:, :, i] = np.mod(samples[:, :, i], 360.0)
+#    for i in [1, 3, 4]:
+#        samples[:, :, i] = np.mod(samples[:, :, i], 360.0)
     
     labels = [r"$i$", r"$\Omega$", r"$e$", r"$\omega$", r"$M$", r"$n_0$", r"$B^{*}$"]
     for i in range(ndim):

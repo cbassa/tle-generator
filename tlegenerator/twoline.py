@@ -97,7 +97,13 @@ def format_tle(satno, epochyr, epochdoy, incl, node, ecc, argp, m, n, bstar=0, n
     
     # Format B* drag term
     bstarstr = format_bstar_or_nddot(bstar)
-    
+
+    # Keep in range
+    incl = np.mod(incl, 180.0)
+    node = np.mod(node, 360.0)
+    argp = np.mod(argp, 360.0)
+    m = np.mod(m, 360.0)
+        
     # Format lines
     line0 = f"{name}"
     line1 = f"1 {satno:05d}{classification:1s} {desig:8s} {epochyr:02d}{epochdoy:012.8f} " \
