@@ -459,7 +459,7 @@ def decode_iod_observation(iod_line, observers):
         sp = me * 10**(xe - 8)
 
         # Decode angles
-        p = None
+        decode_angle = False
         angle1 = iod_line[47:54]
         angle2 = iod_line[54:61]
         if angle_format == 1:
@@ -468,9 +468,9 @@ def decode_iod_observation(iod_line, observers):
                 ra = decode_HHMMSSs(angle1)
                 dec = decode_DDMMSS(angle2)
                 p = SkyCoord(ra=ra, dec=dec, frame=frame)
+                decode_angle = True
             except:
                 logging.debug(f"Failed to decode position (format {angle_format})")
-                p = None
             sp = sp / 3600
         elif angle_format == 2:
             # Format 2: RA/DEC = HHMMmmm+DDMMmm MX   (MX in minutes of arc)
@@ -478,9 +478,9 @@ def decode_iod_observation(iod_line, observers):
                 ra = decode_HHMMmmm(angle1)
                 dec = decode_DDMMmm(angle2)
                 p = SkyCoord(ra=ra, dec=dec, frame=frame)
+                decode_angle = True                
             except:
                 logging.debug(f"Failed to decode position (format {angle_format})")
-                p = None
             sp = sp / 60
         elif angle_format == 3:
             # Format 3: RA/DEC = HHMMmmm+DDdddd MX   (MX in degrees of arc)
@@ -488,9 +488,9 @@ def decode_iod_observation(iod_line, observers):
                 ra = decode_HHMMmmm(angle1)
                 dec = decode_DDdddd(angle2)
                 p = SkyCoord(ra=ra, dec=dec, frame=frame)
+                decode_angle = True                
             except:
                 logging.debug(f"Failed to decode position (format {angle_format})")
-                p = None
         elif angle_format == 4:
             logging.debug("Format not implemented")
             # Format 4: AZ/EL  = DDDMMSS+DDMMSS MX   (MX in seconds of arc)
@@ -517,6 +517,7 @@ def decode_iod_observation(iod_line, observers):
                 ra = decode_HHMMSSs(angle1)
                 dec = decode_DDdddd(angle2)
                 p = SkyCoord(ra=ra, dec=dec, frame=frame)
+                decode_angle = True
             except:
                 logging.debug(f"Failed to decode position (format {angle_format})")
                 p = None
@@ -530,7 +531,8 @@ def decode_iod_observation(iod_line, observers):
         return None
 
     # Discard observations without valid positions
-    if p == None:
+    if not decode_angle:
+        logging.debug(f"No valid position parsed")
         return None
 
     # Propagate of FK5
@@ -543,12 +545,12 @@ def decode_iod_observation(iod_line, observers):
         if observer.site_id == site_id:
             found = True
             break
-
+        
     # Discard observations with missing site information
     if not found:
         logging.debug(f"Site information missing for {site_id}")
         return None
-    
+
     # Format observation
     o = Observation(satno, desig_year, desig_id, site_id, obs_condition, t, st, p, sp, angle_format, epoch, iod_line, "", "", "", "", observer)
         

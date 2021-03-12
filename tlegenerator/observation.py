@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import numpy as np
-import astropy._erfa as erfa
+import erfa
 import astropy.units as u
 from astropy.time import Time
 from astropy.coordinates import EarthLocation
