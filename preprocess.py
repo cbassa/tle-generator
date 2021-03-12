@@ -18,9 +18,6 @@ from tlegenerator import update
 if __name__ == "__main__":
     # Read command line arguments
     parser = argparse.ArgumentParser(description="Preprocess observations.")
-    parser.add_argument("-o", "--output", type=str,
-                        help="Output TLE catalog [default: output.txt]",
-                        metavar="FILE", default="output.txt")
     parser.add_argument("-i", "--ident", type=int,
                         help="NORAD ID to update")
     parser.add_argument("-t", "--endtime",
