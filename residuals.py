@@ -158,6 +158,6 @@ if __name__ == "__main__":
     ax4.set_ylabel(r"Angular offset ($^\circ$)")
     ax1.legend(ncol=len(uniq_sites), loc="upper center")
     plt.tight_layout()
-    plt.savefig(f"results/{tle.satno:05d}_{tstr}.png", bbox_inches="tight")
+    plt.savefig(f"{tle.satno:05d}_{tstr}.png", bbox_inches="tight")
     #plt.show()
     plt.close()

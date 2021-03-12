@@ -13,7 +13,8 @@ from astropy.time import Time
 import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
 import matplotlib.dates as mdates
-from scipy import optimize as scipy_optimize
+import corner
+import emcee
 
 from tlegenerator import observation as obs
 from tlegenerator import formats as fmt
@@ -77,45 +78,80 @@ if __name__ == "__main__":
     tmax = np.max(d.tobs)
     tmin = np.min(d.tobs)
 
-    # Propagate
-    propepoch = tmax.datetime
-    proptle, converged = twoline.propagate(tle, propepoch, drmin=1e-3, dvmin=1e-6, niter=100)
-
     # Extract parameters
-    p = np.array([proptle.incl, proptle.node, proptle.ecc, proptle.argp, proptle.m, proptle.n, proptle.bstar])
+    a = np.array([tle.incl, tle.node, tle.ecc, tle.argp, tle.m, tle.n, tle.bstar])
+    sa = np.array([0.0001, 0.0001, 0.000001, 0.0001, 0.0001, 0.00001, 1e-5])
 
     # Compute prefit RMS
-    prefit_rms = optimize.rms(optimize.residuals(p, proptle.satno, proptle.epochyr, proptle.epochdoy, d))
+    prefit_rms = optimize.rms(optimize.residuals(a, tle.satno, tle.epochyr, tle.epochdoy, d))
+    
+    # Intialize walkders
+    pos = a + sa * np.random.randn(32, len(a))
+    nwalkers, ndim = pos.shape
 
-    # Optimize
-    for i in range(10):
-        p = scipy_optimize.fmin(optimize.chisq, p, args=(proptle.satno, proptle.epochyr, proptle.epochdoy, d), disp=False)
+    # Run sampler
+    sampler = emcee.EnsembleSampler(nwalkers, ndim, optimize.log_probability, args=(tle.satno, tle.epochyr, tle.epochdoy, d))
+    sampler.run_mcmc(pos, 10000, progress=True);
+
+    # Plot walkers
+    fig, axes = plt.subplots(ndim, figsize=(10, 7), sharex=True)
+    samples = sampler.get_chain()
+    # Keep in range
+    for i in [1, 3, 4]:
+        samples[:, :, i] = np.mod(samples[:, :, i], 360.0)
+    
+    labels = [r"$i$", r"$\Omega$", r"$e$", r"$\omega$", r"$M$", r"$n_0$", r"$B^{*}$"]
+    for i in range(ndim):
+        ax = axes[i]
+        ax.plot(samples[:, :, i], "k", alpha=0.3)
+        ax.set_xlim(0, len(samples))
+        ax.set_ylabel(labels[i])
+        ax.yaxis.set_label_coords(-0.1, 0.5)
+
+        axes[-1].set_xlabel("step number");
+    plt.savefig("walkers.png")
+
+    #tau = sampler.get_autocorr_time()
+    #print(tau)
+
+    flat_samples = sampler.get_chain(discard=2000, thin=10, flat=True)
+
+    q = np.median(flat_samples, axis=0)
+    sq = np.std(flat_samples, axis=0)
+#    for i in range(len(q)):
+#        print("%d %f +- %f" % (i, q[i], sq[i]))
+        
+    postfit_rms = optimize.rms(optimize.residuals(q, tle.satno, tle.epochyr, tle.epochdoy, d))
+        
+    fig = corner.corner(flat_samples, labels=labels, truths=a)
+    #fig.set_size_inches(12, 12)
+    plt.savefig("corner.png", dpi=70)
 
     # Format TLE
-    line0, line1, line2 = twoline.format_tle(proptle.satno, proptle.epochyr, proptle.epochdoy, *p, proptle.name, proptle.desig, classification="S")
+    line0, line1, line2 = twoline.format_tle(tle.satno, tle.epochyr, tle.epochdoy, *q, tle.name, tle.desig, classification="M")
     newtle = twoline.TwoLineElement(line0, line1, line2)
-
-    # Compute postfit RMS
-    postfit_rms = optimize.rms(optimize.residuals(p, newtle.satno, newtle.epochyr, newtle.epochdoy, d))
     
     # Get in-track, cross-track residuals
     dt, dr = optimize.track_residuals(newtle, d)
 
     print(f"{newtle.line0}\n{newtle.line1}\n{newtle.line2}\n# {optimize.format_time_for_output(np.min(d.tobs[d.mask]))}-{optimize.format_time_for_output(np.max(d.tobs[d.mask]))}, {np.sum(d.mask)} obs, {optimize.rms(dt):.4f} sec, {optimize.rms(dr):.4f} deg rms")
-
+    
     # Store yaml
     data = {"tle": {"line0": newtle.line0,
                     "line1": newtle.line1,
                     "line2": newtle.line2},
             "observations": [o.iod_line for o in observations]}
     
-    with open(f"{newtle.satno:05d}.yaml", "w") as fp:
+    with open(f"{tle.satno:05d}.yaml", "w") as fp:
         yaml.dump(data, fp, sort_keys=True)
 
     # Store TLE
-    with open(f"{newtle.satno:05d}.txt", "w") as f:
-        f.write(f"{newtle.line0}\n{newtle.line1}\n{newtle.line2}\n# {optimize.format_time_for_output(np.min(d.tobs[d.mask]))}-{optimize.format_time_for_output(np.max(d.tobs[d.mask]))}, {np.sum(d.mask)} obs, {optimize.rms(dt):.4f} sec, {optimize.rms(dr):.4f} deg rms\n")
+    with open(f"{tle.satno:05d}.txt", "w") as f:
+        f.write(f"{newtle.line0}\n{newtle.line1}\n{newtle.line2}\n")
 
-    
-
-        
+    # Store samples
+    with open(f"{tle.satno:05d}_mcmc.txt", "w") as f:
+        for i in np.random.randint(0, flat_samples.shape[0], 100):
+            line0, line1, line2 = twoline.format_tle(tle.satno, tle.epochyr, tle.epochdoy, *flat_samples[i], tle.name, tle.desig)
+            newtle = twoline.TwoLineElement(line0, line1, line2)
+            f.write(f"{tle.line0}\n{tle.line1}\n{tle.line2}\n# {optimize.format_time_for_output(np.min(d.tobs[d.mask]))}-{optimize.format_time_for_output(np.max(d.tobs[d.mask]))}, {np.sum(d.mask)} obs, {optimize.rms(dt):.4f} sec, {optimize.rms(dr):.4f} deg rms\n")

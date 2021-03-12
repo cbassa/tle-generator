@@ -118,15 +118,15 @@ if __name__ == "__main__":
                     "line2": tle.line2},
             "observations": [o.iod_line for o in observations]}
     
-    with open(f"results/{tle.satno:05d}.yaml", "w") as fp:
+    with open(f"{tle.satno:05d}.yaml", "w") as fp:
         yaml.dump(data, fp, sort_keys=True)
 
     # Store TLE
-    with open(f"results/{tle.satno:05d}.txt", "w") as f:
+    with open(f"{tle.satno:05d}.txt", "w") as f:
         f.write(f"{tle.line0}\n{tle.line1}\n{tle.line2}\n")
 
     # Store data
-    with open(f"results/{tle.satno:05d}.dat", "w") as f:
+    with open(f"{tle.satno:05d}.dat", "w") as f:
         for o in observations:
             f.write(f"{o.iod_line}\n")
         
