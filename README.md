@@ -68,6 +68,6 @@ Consider using a VirtualEnv to run stvid on a separate python virtual environmen
   ./ingest.py -c 37386.txt
   ```
 ## License
-&copy; 2020 Cees Bassa
+&copy; 2019-2021 Cees Bassa
 
 Licensed under the [GPLv3 or later](LICENSE).
