@@ -31,6 +31,9 @@ if __name__ == "__main__":
     parser.add_argument("-C", "--conf_file",
                         help="Specify configuration file. [default: configuration.ini]",
                         metavar="FILE", default="configuration.ini")
+    parser.add_argument("-e", "--keep_epoch",
+                        help="Do not propagate epoch to the time of the latest observation",
+                        action="store_true")
     args = parser.parse_args()
 
     # Set up logging
@@ -78,21 +81,21 @@ if __name__ == "__main__":
     tmin = np.min(d.tobs)
 
     # Propagate
-    propepoch = tmax.datetime
-    proptle, converged = twoline.propagate(tle, propepoch, drmin=1e-3, dvmin=1e-6, niter=100)
+    if not args.keep_epoch:
+        tle, converged = twoline.propagate(tle, tmax.datetime, drmin=1e-3, dvmin=1e-6, niter=100)
 
     # Extract parameters
-    p = np.array([proptle.incl, proptle.node, proptle.ecc, proptle.argp, proptle.m, proptle.n, proptle.bstar])
+    p = np.array([tle.incl, tle.node, tle.ecc, tle.argp, tle.m, tle.n, tle.bstar])
 
     # Compute prefit RMS
-    prefit_rms = optimize.rms(optimize.residuals(p, proptle.satno, proptle.epochyr, proptle.epochdoy, d))
+    prefit_rms = optimize.rms(optimize.residuals(p, tle.satno, tle.epochyr, tle.epochdoy, d))
 
     # Optimize
     for i in range(10):
-        p = scipy_optimize.fmin(optimize.chisq, p, args=(proptle.satno, proptle.epochyr, proptle.epochdoy, d), disp=False)
+        p = scipy_optimize.fmin(optimize.chisq, p, args=(tle.satno, tle.epochyr, tle.epochdoy, d), disp=False)
 
     # Format TLE
-    line0, line1, line2 = twoline.format_tle(proptle.satno, proptle.epochyr, proptle.epochdoy, *p, proptle.name, proptle.desig, classification="S")
+    line0, line1, line2 = twoline.format_tle(tle.satno, tle.epochyr, tle.epochdoy, *p, tle.name, tle.desig, classification="S")
     newtle = twoline.TwoLineElement(line0, line1, line2)
 
     # Compute postfit RMS
