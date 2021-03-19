@@ -10,6 +10,8 @@ import numpy as np
 import astropy.units as u
 from astropy.time import Time
 
+from sgp4.api import Satrec, SatrecArray
+
 import matplotlib.pyplot as plt
 from matplotlib.ticker import AutoMinorLocator
 import matplotlib.dates as mdates
@@ -96,9 +98,6 @@ if __name__ == "__main__":
     # Plot walkers
     fig, axes = plt.subplots(ndim, figsize=(10, 7), sharex=True)
     samples = sampler.get_chain()
-    # Keep in range
-#    for i in [1, 3, 4]:
-#        samples[:, :, i] = np.mod(samples[:, :, i], 360.0)
     
     labels = [r"$i$", r"$\Omega$", r"$e$", r"$\omega$", r"$M$", r"$n_0$", r"$B^{*}$"]
     for i in range(ndim):
@@ -109,23 +108,17 @@ if __name__ == "__main__":
         ax.yaxis.set_label_coords(-0.1, 0.5)
 
         axes[-1].set_xlabel("step number");
-    plt.savefig("walkers.png")
+    plt.savefig(f"{tle.satno:05d}_walkers.png")
 
-    #tau = sampler.get_autocorr_time()
-    #print(tau)
-
+    # Plot corner
     flat_samples = sampler.get_chain(discard=2000, thin=10, flat=True)
+    fig = corner.corner(flat_samples, labels=labels, truths=a, quantiles=(0.16, 0.5, 0.84))
+    plt.savefig(f"{tle.satno:05d}_corner.png", dpi=70)
 
+    # Compute parameters
     q = np.median(flat_samples, axis=0)
     sq = np.std(flat_samples, axis=0)
-#    for i in range(len(q)):
-#        print("%d %f +- %f" % (i, q[i], sq[i]))
-        
     postfit_rms = optimize.rms(optimize.residuals(q, tle.satno, tle.epochyr, tle.epochdoy, d))
-        
-    fig = corner.corner(flat_samples, labels=labels, truths=a)
-    #fig.set_size_inches(12, 12)
-    plt.savefig("corner.png", dpi=70)
 
     # Format TLE
     line0, line1, line2 = twoline.format_tle(tle.satno, tle.epochyr, tle.epochdoy, *q, tle.name, tle.desig, classification="M")
@@ -155,3 +148,45 @@ if __name__ == "__main__":
             line0, line1, line2 = twoline.format_tle(tle.satno, tle.epochyr, tle.epochdoy, *flat_samples[i], tle.name, tle.desig)
             newtle = twoline.TwoLineElement(line0, line1, line2)
             f.write(f"{tle.line0}\n{tle.line1}\n{tle.line2}\n# {optimize.format_time_for_output(np.min(d.tobs[d.mask]))}-{optimize.format_time_for_output(np.max(d.tobs[d.mask]))}, {np.sum(d.mask)} obs, {optimize.rms(dt):.4f} sec, {optimize.rms(dr):.4f} deg rms\n")
+
+    # Compute SGP4 position and velocity for reference TLE
+    aref = np.array([tle.incl, tle.node, tle.ecc, tle.argp, tle.m, tle.n, tle.bstar])
+    refsat = Satrec.twoline2rv(tle.line1, tle.line2)
+    jd = refsat.jdsatepoch + refsat.jdsatepochF
+    jdint = np.floor(jd)
+    jdfrac = jd - jdint
+
+    e, rsat, vsat = refsat.sgp4(jdint, jdfrac)
+    qref = np.concatenate([rsat, vsat])
+
+    # Compute SGP4 position and velocity of MCMC chain
+    sats = []
+    for f in flat_samples:
+        line0, line1, line2 = twoline.format_tle(tle.satno, tle.epochyr, tle.epochdoy, *f, tle.name, tle.desig, classification="M")
+        tle = twoline.TwoLineElement(line0, line1, line2)
+        sats.append(Satrec.twoline2rv(tle.line1, tle.line2))
+    sat = SatrecArray(sats)
+    jdint = np.array([jdint])
+    jdfrac = np.array([jdfrac])
+    e, rsat, vsat = sat.sgp4(jdint, jdfrac)
+
+    # Compute vector differences
+    flat_samples = np.hstack([rsat.squeeze(), vsat.squeeze()]) - qref
+    qref = np.zeros(6)
+
+    # Convert velocities to m/s
+    for i in range(3, 6):
+        flat_samples[:, i] *= 1000
+
+    # Report results
+    q, sq = np.mean(flat_samples, axis=0), np.std(flat_samples, axis=0)
+    text = f"{tle.satno:05d}"
+    for i in range(6):
+        text = text + f"{q[i]:7.3f}+-{sq[i]:.3f} "
+    print(text + f"{np.sum(d.mask)} {optimize.rms(dt):.4f} {optimize.rms(dr):.4f}")
+        
+    # Create corner plot
+    #labels = [r"$x$ (km)", r"$y$ (km)", r"$z$ (km)", r"$v_x$ (km s$^{-1}$)", r"$v_y$ (km s$^{-1}$)", r"$v_z$ (km s$^{-1}$)"]
+    labels = [r"$\Delta x$ (km)", r"$\Delta y$ (km)", r"$\Delta z$ (km)", r"$\Delta v_x$ (m s$^{-1}$)", r"$\Delta v_y$ (m s$^{-1}$)", r"$\Delta v_z$ (m s$^{-1}$)"]
+    fig = corner.corner(flat_samples, labels=labels, truths=qref, quantiles=(0.16, 0.5, 0.84))
+    plt.savefig(f"{tle.satno:05d}_corner_cart_delta.png", dpi=70)

@@ -93,37 +93,40 @@ if __name__ == "__main__":
     rows = cur.fetchall()
     logger.info(f"Selected {len(rows)} observations of {satno} between {tmin.isot} and {tmax.isot}")
 
-    # Exit if no observations
-    if len(rows) == 0:
-        sys.exit()
+    data = {}
     
-    # Store observations
-    observations = [fmt.decode_iod_observation(row[0], observers) for row in rows]
+    # Process observations
+    if len(rows) > 0:
+        # Store observations
+        observations = [fmt.decode_iod_observation(row[0], observers) for row in rows]
 
+        # Store data
+        with open(f"{satno:05d}.dat", "w") as f:
+            for o in observations:
+                f.write(f"{o.iod_line}\n")
+    
+        # Store yaml
+        data = data | {"observations": [o.iod_line for o in observations]}
+    
     # Select TLE
     cur = conn.cursor()
     cur.execute("SELECT line0,line1,line2 FROM elements WHERE epoch < ? AND satno = ? ORDER BY epoch DESC LIMIT 1", (tmax.datetime, satno))
     rows = cur.fetchall()
 
-    # Store TLE
-    row = rows[0]
-    tle = twoline.TwoLineElement(row[0], row[1], row[2])
-    
-    # Store yaml
-    data = {"tle": {"line0": tle.line0,
-                    "line1": tle.line1,
-                    "line2": tle.line2},
-            "observations": [o.iod_line for o in observations]}
-    
-    with open(f"{tle.satno:05d}.yaml", "w") as fp:
+    # Process TLE
+    if len(rows) > 0:
+        row = rows[0]
+        tle = twoline.TwoLineElement(row[0], row[1], row[2])
+        
+        data = data | {"tle": {"line0": tle.line0,
+                               "line1": tle.line1,
+                               "line2": tle.line2}}
+        
+        # Store TLE
+        with open(f"{satno:05d}.txt", "w") as f:
+            f.write(f"{tle.line0}\n{tle.line1}\n{tle.line2}\n")
+
+    # Store YAML
+    with open(f"{satno:05d}.yaml", "w") as fp:
         yaml.dump(data, fp, sort_keys=True)
-
-    # Store TLE
-    with open(f"{tle.satno:05d}.txt", "w") as f:
-        f.write(f"{tle.line0}\n{tle.line1}\n{tle.line2}\n")
-
-    # Store data
-    with open(f"{tle.satno:05d}.dat", "w") as f:
-        for o in observations:
-            f.write(f"{o.iod_line}\n")
         
