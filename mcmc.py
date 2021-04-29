@@ -34,6 +34,15 @@ if __name__ == "__main__":
     parser.add_argument("-C", "--conf_file",
                         help="Specify configuration file. [default: configuration.ini]",
                         metavar="FILE", default="configuration.ini")
+    parser.add_argument("-n", "--steps",
+                        help="Number of MCMC steps. [default: 10000]",
+                        type=int, default=10000)
+    parser.add_argument("-d", "--discard",
+                        help="Number of MCMC steps to discard at start of chain. [default: 2000]",
+                        type=int, default=2000)
+    parser.add_argument("-t", "--thin",
+                        help="MCMC thinning factor. [default: 10]",
+                        type=int, default=10)
     args = parser.parse_args()
 
     # Set up logging
@@ -53,6 +62,9 @@ if __name__ == "__main__":
     # Input checking
     if not os.path.exists(args.conf_file):
         logger.error(f"{args.conf_file} not found")
+        sys.exit()
+    if args.discard >= args.steps:
+        logger.error("Discarding too many steps")
         sys.exit()
         
     # Read configuration file
@@ -93,7 +105,7 @@ if __name__ == "__main__":
 
     # Run sampler
     sampler = emcee.EnsembleSampler(nwalkers, ndim, optimize.log_probability, args=(tle.satno, tle.epochyr, tle.epochdoy, d))
-    sampler.run_mcmc(pos, 10000, progress=True);
+    sampler.run_mcmc(pos, args.steps, progress=True);
 
     # Plot walkers
     fig, axes = plt.subplots(ndim, figsize=(10, 7), sharex=True)
@@ -111,7 +123,7 @@ if __name__ == "__main__":
     plt.savefig(f"{tle.satno:05d}_walkers.png")
 
     # Plot corner
-    flat_samples = sampler.get_chain(discard=2000, thin=10, flat=True)
+    flat_samples = sampler.get_chain(discard=args.discard, thin=args.thin, flat=True)
     fig = corner.corner(flat_samples, labels=labels, truths=a, quantiles=(0.16, 0.5, 0.84))
     plt.savefig(f"{tle.satno:05d}_corner.png", dpi=70)
 
@@ -147,7 +159,7 @@ if __name__ == "__main__":
         for i in np.random.randint(0, flat_samples.shape[0], 100):
             line0, line1, line2 = twoline.format_tle(tle.satno, tle.epochyr, tle.epochdoy, *flat_samples[i], tle.name, tle.desig)
             newtle = twoline.TwoLineElement(line0, line1, line2)
-            f.write(f"{tle.line0}\n{tle.line1}\n{tle.line2}\n# {optimize.format_time_for_output(np.min(d.tobs[d.mask]))}-{optimize.format_time_for_output(np.max(d.tobs[d.mask]))}, {np.sum(d.mask)} obs, {optimize.rms(dt):.4f} sec, {optimize.rms(dr):.4f} deg rms\n")
+            f.write(f"{newtle.line0}\n{newtle.line1}\n{newtle.line2}\n# {optimize.format_time_for_output(np.min(d.tobs[d.mask]))}-{optimize.format_time_for_output(np.max(d.tobs[d.mask]))}, {np.sum(d.mask)} obs, {optimize.rms(dt):.4f} sec, {optimize.rms(dr):.4f} deg rms\n")
 
     # Compute SGP4 position and velocity for reference TLE
     aref = np.array([tle.incl, tle.node, tle.ecc, tle.argp, tle.m, tle.n, tle.bstar])
