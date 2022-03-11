@@ -36,28 +36,29 @@ def residuals(a, satno, epochyr, epochdoy, d):
 def chisq(a, satno, epochyr, epochdoy, d):
     return np.sum((residuals(a, satno, epochyr, epochdoy, d) / d.perr[d.mask] * d.weight[d.mask])**2)
 
+
 def log_likelihood(a, satno, epochyr, epochdoy, d):
     r = residuals(a, satno, epochyr, epochdoy, d)
     return -0.5 * np.sum(((r / d.perr[d.mask] * d.weight[d.mask]) ** 2 + np.log(2.0 * np.pi * d.perr[d.mask] ** 2)))
+
+
+def log_likelihood_fixed_bstar(a, satno, epochyr, epochdoy, bstar, d):
+    b = np.append(a, bstar)
+    r = residuals(b, satno, epochyr, epochdoy, d)
+    return -0.5 * np.sum(((r / d.perr[d.mask] * d.weight[d.mask]) ** 2 + np.log(2.0 * np.pi * d.perr[d.mask] ** 2)))
+
 
 def log_prior(a):
     if 0.0 <= np.mod(a[0], 180.0) <= 180.0 and 0.0 <= np.mod(a[1], 360.0) < 360.0 and 0.0 < a[2] < 1.0 and 0.0 <= np.mod(a[3], 360.0) < 360.0 and 0.0 <= np.mod(a[4], 360.0) < 360.0 and 0.035 <= a[5] <= 18.0 and np.abs(a[6]) < 1e-2:
         return 0.0
     return -np.inf
 
-def log_prior_circular(a):
-    if 0.0 <= np.mod(a[0], 180.0) <= 180.0 and 0.0 <= np.mod(a[1], 360.0) < 360.0 and 0.0 <= np.mod(a[4], 360.0) < 360.0 and 0.035 <= a[5] <= 18.0:
-        ecc, argp, bstar = a[2], a[3], a[6]
-        mecc = 0.0001
-        secc = 0.00001
-        margp = 180.0
-        sargp = 0.0001
-        mbstar = 5e-5
-        sbstar = 1e-7
-        lp = -0.5 * ((ecc - mecc) / secc)**2 - 0.5 * ((argp - margp) / sargp)**2 - 0.5 * ((bstar - mbstar) / sbstar)**2
-    else:
-        lp = -np.inf
-    return lp
+
+def log_prior_fixed_bstar(a):
+    if 0.0 <= np.mod(a[0], 180.0) <= 180.0 and 0.0 <= np.mod(a[1], 360.0) < 360.0 and 0.0 < a[2] < 1.0 and 0.0 <= np.mod(a[3], 360.0) < 360.0 and 0.0 <= np.mod(a[4], 360.0) < 360.0 and 0.035 <= a[5] <= 18.0:
+        return 0.0
+    return -np.inf
+
 
 def log_probability(a, satno, epochyr, epochdoy, d):
     lp = log_prior(a)
@@ -68,8 +69,20 @@ def log_probability(a, satno, epochyr, epochdoy, d):
         return -np.inf
     return lp + ll
 
+
+def log_probability_fixed_bstar(a, satno, epochyr, epochdoy, bstar, d):
+    lp = log_prior_fixed_bstar(a)
+    if not np.isfinite(lp):
+        return -np.inf
+    ll = log_likelihood_fixed_bstar(a, satno, epochyr, epochdoy, bstar, d)
+    if np.isnan(ll):
+        return -np.inf
+    return lp + ll
+
+
 def rms(x):
     return np.sqrt(np.sum(x**2) / len(x))
+
 
 def track_residuals(tle, d):
     # Observed positions
@@ -114,6 +127,7 @@ def track_residuals(tle, d):
     dr = rxobs * sa + ryobs * ca
 
     return dt, dr.to(u.deg).value
+
 
 def format_time_for_output(t):
     fday = t.mjd - np.floor(t.mjd)
