@@ -33,12 +33,21 @@ class TwoLineElement:
         self.epochdoy = float(line1[20:32])
         self.ndot = float(line1[33:43])
         fvalue = float(line1[44] + "." + line1[45:50])
-        fexp = int(line1[50:52])
+        try:
+            fexp = int(line1[50:52])
+        except:
+            print(line1)
         self.nddot = fvalue * 10 ** fexp
         fvalue = float(line1[53] + "." + line1[54:59])
-        fexp = int(line1[59:61])
+        try:
+            fexp = int(line1[59:61])
+        except:
+            print(line1)
         self.bstar = fvalue * 10 ** fexp
-        self.ephtype = int(line1[62])
+        try:
+            self.ephtype = int(line1[62])
+        except:
+            print(line1)
         self.elnum = int(line1[64:68])
         
         # Process line 2
