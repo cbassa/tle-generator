@@ -92,6 +92,10 @@ if __name__ == "__main__":
     tmax = np.max(d.tobs)
     tmin = np.min(d.tobs)
 
+    # Fixed bstar
+    fixed_bstar = True
+    bstar = 0.0
+
     # Extract parameters
     a = np.array([tle.incl, tle.node, tle.ecc, tle.argp, tle.m, tle.n, tle.bstar])
     sa = np.array([0.0001, 0.0001, 0.000001, 0.0001, 0.0001, 0.00001, 1e-5])
@@ -104,8 +108,13 @@ if __name__ == "__main__":
     nwalkers, ndim = pos.shape
 
     # Run sampler
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, optimize.log_probability, args=(tle.satno, tle.epochyr, tle.epochdoy, d))
-    sampler.run_mcmc(pos, args.steps, progress=True);
+    if not fixed_bstar:
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, optimize.log_probability, args=(tle.satno, tle.epochyr, tle.epochdoy, d))
+        sampler.run_mcmc(pos, args.steps, progress=True);
+    else:
+        ndim = len(a) - 1
+        sampler = emcee.EnsembleSampler(nwalkers, ndim , optimize.log_probability_fixed_bstar, args=(tle.satno, tle.epochyr, tle.epochdoy, bstar, d))
+        sampler.run_mcmc(pos[:, :-1], args.steps, progress=True);
 
     # Plot walkers
     fig, axes = plt.subplots(ndim, figsize=(10, 7), sharex=True)
@@ -130,8 +139,12 @@ if __name__ == "__main__":
     # Compute parameters
     q = np.median(flat_samples, axis=0)
     sq = np.std(flat_samples, axis=0)
+    if fixed_bstar:
+        q = np.append(q, bstar)
+    print(q)
     postfit_rms = optimize.rms(optimize.residuals(q, tle.satno, tle.epochyr, tle.epochdoy, d))
 
+        
     # Format TLE
     line0, line1, line2 = twoline.format_tle(tle.satno, tle.epochyr, tle.epochdoy, *q, tle.name, tle.desig, classification="M")
     newtle = twoline.TwoLineElement(line0, line1, line2)
@@ -157,7 +170,10 @@ if __name__ == "__main__":
     # Store samples
     with open(f"{tle.satno:05d}_mcmc.txt", "w") as f:
         for i in np.random.randint(0, flat_samples.shape[0], 100):
-            line0, line1, line2 = twoline.format_tle(tle.satno, tle.epochyr, tle.epochdoy, *flat_samples[i], tle.name, tle.desig)
+            q = flat_samples[i]
+            if fixed_bstar:
+                q = np.append(q, bstar)
+            line0, line1, line2 = twoline.format_tle(tle.satno, tle.epochyr, tle.epochdoy, *q, tle.name, tle.desig)
             newtle = twoline.TwoLineElement(line0, line1, line2)
             f.write(f"{newtle.line0}\n{newtle.line1}\n{newtle.line2}\n# {optimize.format_time_for_output(np.min(d.tobs[d.mask]))}-{optimize.format_time_for_output(np.max(d.tobs[d.mask]))}, {np.sum(d.mask)} obs, {optimize.rms(dt):.4f} sec, {optimize.rms(dr):.4f} deg rms\n")
 
@@ -174,7 +190,10 @@ if __name__ == "__main__":
     # Compute SGP4 position and velocity of MCMC chain
     sats = []
     for f in flat_samples:
-        line0, line1, line2 = twoline.format_tle(tle.satno, tle.epochyr, tle.epochdoy, *f, tle.name, tle.desig, classification="M")
+        q = f
+        if fixed_bstar:
+            q = np.append(q, bstar)
+        line0, line1, line2 = twoline.format_tle(tle.satno, tle.epochyr, tle.epochdoy, *q, tle.name, tle.desig, classification="M")
         tle = twoline.TwoLineElement(line0, line1, line2)
         sats.append(Satrec.twoline2rv(tle.line1, tle.line2))
     sat = SatrecArray(sats)
