@@ -93,7 +93,7 @@ if __name__ == "__main__":
     tmin = np.min(d.tobs)
 
     # Fixed bstar
-    fixed_bstar = True
+    fixed_bstar = False
     bstar = 0.0
 
     # Extract parameters
@@ -141,7 +141,6 @@ if __name__ == "__main__":
     sq = np.std(flat_samples, axis=0)
     if fixed_bstar:
         q = np.append(q, bstar)
-    print(q)
     postfit_rms = optimize.rms(optimize.residuals(q, tle.satno, tle.epochyr, tle.epochdoy, d))
 
         
