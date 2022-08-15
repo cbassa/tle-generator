@@ -25,12 +25,13 @@ from tlegenerator import twoline
 from tlegenerator import optimize
 from tlegenerator import update
 
-if __name__ == "__main__":
+
+def main():
     # Read command line arguments
     parser = argparse.ArgumentParser(description="Compute residuals.")
     parser.add_argument("-y", "--yaml", type=str,
                         help="Input YAML file with TLE and observations",
-                        metavar="FILE")
+                        metavar="FILE", required=True)
     parser.add_argument("-C", "--conf_file",
                         help="Specify configuration file. [default: configuration.ini]",
                         metavar="FILE", default="configuration.ini")
@@ -48,7 +49,7 @@ if __name__ == "__main__":
     # Set up logging
     logFormatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] " +
                                      "[%(levelname)-5.5s]  %(message)s")
-    logger = logging.getLogger()
+    logger = logging.getLogger(__name__)
 
     # Attach handler
     consoleHandler = logging.StreamHandler(sys.stdout)
@@ -220,3 +221,7 @@ if __name__ == "__main__":
     labels = [r"$\Delta x$ (km)", r"$\Delta y$ (km)", r"$\Delta z$ (km)", r"$\Delta v_x$ (m s$^{-1}$)", r"$\Delta v_y$ (m s$^{-1}$)", r"$\Delta v_z$ (m s$^{-1}$)"]
     fig = corner.corner(flat_samples, labels=labels, truths=qref, quantiles=(0.16, 0.5, 0.84))
     plt.savefig(f"{tle.satno:05d}_corner_cart_delta.png", dpi=70)
+
+
+if __name__ == "__main__":
+    main()

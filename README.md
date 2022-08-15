@@ -12,10 +12,15 @@ and create new TLEs or refine already existing TLEs using this data.
 
 `tle-generator` handles dependencies using `pip`. You can install requirements by running:
 ```
-pip install -r requirements.txt
+pip install -e .
 ```
 
 Consider using a VirtualEnv to run stvid on a separate python virtual environment.
+
+If you want to use the mcmc tool, you can install the additional requirements by running:
+```
+pip install -e .[mcmc]
+```
 
 # Configuration
 
@@ -26,11 +31,11 @@ Consider using a VirtualEnv to run stvid on a separate python virtual environmen
 
 - Ingest new observations and/or orbital elements into the database:
   ```
-  ./ingest.py -c elements/37386.txt -d observations/37386.dat
+  ingest -c elements/37386.txt -d observations/37386.dat
   ```
 - Select observations from a satellite over a time range (30 day period upto 2019, May 16):
   ```
-  ./preprocess.py -i 37386 -t 2019-05-16T00:00:00 -l 30
+  preprocess -i 37386 -t 2019-05-16T00:00:00 -l 30
   ```
   The selected observations and nearest orbital elements are stored in a `yaml` file of the form:
   ```
@@ -49,23 +54,23 @@ Consider using a VirtualEnv to run stvid on a separate python virtual environmen
 
 - Compute and plot residuals:
   ```
-  ./residuals.py -y 37386.yaml
+  residuals -y 37386.yaml
   ```
 
 - Improve the fit. This overwrites the TLE in the `yaml` file. Rerun the residual computation for an updated plot:
   ```
-  ./satfit.py -y 37386.yaml
-  ./residuals.py -y 37386.yaml
+  satfit -y 37386.yaml
+  residuals -y 37386.yaml
   ```
   
 - As an option, an `mcmc` analysis can be ran to further improve the fit and investigate the covariances of the parameters:
   ```
-  ./mcmc.py -y 37386.yaml
+  mcmc -y 37386.yaml
   ```
 
 - The updated TLEs can be ingested through: 
   ```
-  ./ingest.py -c 37386.txt
+  ingest -c 37386.txt
   ```
 ## License
 &copy; 2019-2021 Cees Bassa
