@@ -17,6 +17,11 @@ pip install -e .
 
 Consider using a VirtualEnv to run stvid on a separate python virtual environment.
 
+If you want to use the mcmc tool, you can install the additional requirements by running:
+```
+pip install -e .[mcmc]
+```
+
 # Configuration
 
 - Copy the `configuration.ini-dist` file to `configuration.ini`
@@ -60,7 +65,7 @@ Consider using a VirtualEnv to run stvid on a separate python virtual environmen
   
 - As an option, an `mcmc` analysis can be ran to further improve the fit and investigate the covariances of the parameters:
   ```
-  ./mcmc.py -y 37386.yaml
+  mcmc -y 37386.yaml
   ```
 
 - The updated TLEs can be ingested through: 
