@@ -21,12 +21,13 @@ from tlegenerator import twoline
 from tlegenerator import optimize
 from tlegenerator import update
 
-if __name__ == "__main__":
+
+def main():
     # Read command line arguments
     parser = argparse.ArgumentParser(description="Compute residuals.")
     parser.add_argument("-y", "--yaml", type=str,
                         help="Input YAML file with TLE and observations",
-                        metavar="FILE")
+                        metavar="FILE", required=True)
     parser.add_argument("-C", "--conf_file",
                         help="Specify configuration file. [default: configuration.ini]",
                         metavar="FILE", default="configuration.ini")
@@ -35,7 +36,7 @@ if __name__ == "__main__":
     # Set up logging
     logFormatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] " +
                                      "[%(levelname)-5.5s]  %(message)s")
-    logger = logging.getLogger()
+    logger = logging.getLogger(__name__)
 
     # Attach handler
     consoleHandler = logging.StreamHandler(sys.stdout)
@@ -161,3 +162,7 @@ if __name__ == "__main__":
     plt.savefig(f"{tle.satno:05d}_{tstr}.png", bbox_inches="tight")
     #plt.show()
     plt.close()
+
+
+if __name__ == "__main__":
+    main()

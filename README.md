@@ -49,13 +49,13 @@ Consider using a VirtualEnv to run stvid on a separate python virtual environmen
 
 - Compute and plot residuals:
   ```
-  ./residuals.py -y 37386.yaml
+  residuals -y 37386.yaml
   ```
 
 - Improve the fit. This overwrites the TLE in the `yaml` file. Rerun the residual computation for an updated plot:
   ```
   ./satfit.py -y 37386.yaml
-  ./residuals.py -y 37386.yaml
+  residuals -y 37386.yaml
   ```
   
 - As an option, an `mcmc` analysis can be ran to further improve the fit and investigate the covariances of the parameters:
