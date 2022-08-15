@@ -30,7 +30,7 @@ Consider using a VirtualEnv to run stvid on a separate python virtual environmen
   ```
 - Select observations from a satellite over a time range (30 day period upto 2019, May 16):
   ```
-  ./preprocess.py -i 37386 -t 2019-05-16T00:00:00 -l 30
+  preprocess -i 37386 -t 2019-05-16T00:00:00 -l 30
   ```
   The selected observations and nearest orbital elements are stored in a `yaml` file of the form:
   ```

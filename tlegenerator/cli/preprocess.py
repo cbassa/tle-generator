@@ -15,7 +15,8 @@ from tlegenerator import database as db
 from tlegenerator import twoline
 from tlegenerator import update
 
-if __name__ == "__main__":
+
+def main():
     # Read command line arguments
     parser = argparse.ArgumentParser(description="Preprocess observations.")
     parser.add_argument("-i", "--ident", type=int,
@@ -129,4 +130,7 @@ if __name__ == "__main__":
     # Store YAML
     with open(f"{satno:05d}.yaml", "w") as fp:
         yaml.dump(data, fp, sort_keys=True)
-        
+
+
+if __name__ == "__main__":
+    main()
