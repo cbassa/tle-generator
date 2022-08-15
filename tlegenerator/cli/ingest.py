@@ -108,7 +108,7 @@ def parse_elements(lines, origin=None):
     return elements
  
 
-if __name__ == "__main__":
+def main():
     # Read command line arguments
     parser = argparse.ArgumentParser(description="Import observations file into the common file structure.")
     parser.add_argument("-d", "--data", type=str,
@@ -199,3 +199,7 @@ if __name__ == "__main__":
             cur = conn.cursor()
             cur.executemany(db.sql_insert_elements, elements)
             logger.info(f"Processed {len(elements)} TLEs")
+
+
+if __name__ == "__main__":
+    main()
