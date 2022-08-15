@@ -54,7 +54,7 @@ Consider using a VirtualEnv to run stvid on a separate python virtual environmen
 
 - Improve the fit. This overwrites the TLE in the `yaml` file. Rerun the residual computation for an updated plot:
   ```
-  ./satfit.py -y 37386.yaml
+  satfit -y 37386.yaml
   residuals -y 37386.yaml
   ```
   

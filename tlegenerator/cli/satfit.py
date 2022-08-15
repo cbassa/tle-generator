@@ -22,12 +22,13 @@ from tlegenerator import twoline
 from tlegenerator import optimize
 from tlegenerator import update
 
-if __name__ == "__main__":
+
+def main():
     # Read command line arguments
     parser = argparse.ArgumentParser(description="Compute residuals.")
     parser.add_argument("-y", "--yaml", type=str,
                         help="Input YAML file with TLE and observations",
-                        metavar="FILE")
+                        metavar="FILE", required=True)
     parser.add_argument("-C", "--conf_file",
                         help="Specify configuration file. [default: configuration.ini]",
                         metavar="FILE", default="configuration.ini")
@@ -39,7 +40,7 @@ if __name__ == "__main__":
     # Set up logging
     logFormatter = logging.Formatter("%(asctime)s [%(threadName)-12.12s] " +
                                      "[%(levelname)-5.5s]  %(message)s")
-    logger = logging.getLogger()
+    logger = logging.getLogger(__name__)
 
     # Attach handler
     consoleHandler = logging.StreamHandler(sys.stdout)
@@ -119,6 +120,6 @@ if __name__ == "__main__":
     with open(f"{newtle.satno:05d}.txt", "w") as f:
         f.write(f"{newtle.line0}\n{newtle.line1}\n{newtle.line2}\n# {optimize.format_time_for_output(np.min(d.tobs[d.mask]))}-{optimize.format_time_for_output(np.max(d.tobs[d.mask]))}, {np.sum(d.mask)} obs, {optimize.rms(dt):.4f} sec, {optimize.rms(dr):.4f} deg rms\n")
 
-    
 
-        
+if __name__ == "__main__":
+    main()
