@@ -31,11 +31,11 @@ pip install -e .[mcmc]
 
 - Ingest new observations and/or orbital elements into the database:
   ```
-  ingest -c elements/37386.txt -d observations/37386.dat
+  tg_ingest -c elements/37386.txt -d observations/37386.dat
   ```
 - Select observations from a satellite over a time range (30 day period upto 2019, May 16):
   ```
-  preprocess -i 37386 -t 2019-05-16T00:00:00 -l 30
+  tg_preprocess -i 37386 -t 2019-05-16T00:00:00 -l 30
   ```
   The selected observations and nearest orbital elements are stored in a `yaml` file of the form:
   ```
@@ -54,23 +54,23 @@ pip install -e .[mcmc]
 
 - Compute and plot residuals:
   ```
-  residuals -y 37386.yaml
+  tg_residuals -y 37386.yaml
   ```
 
 - Improve the fit. This overwrites the TLE in the `yaml` file. Rerun the residual computation for an updated plot:
   ```
-  satfit -y 37386.yaml
-  residuals -y 37386.yaml
+  tg_satfit -y 37386.yaml
+  tg_residuals -y 37386.yaml
   ```
   
 - As an option, an `mcmc` analysis can be ran to further improve the fit and investigate the covariances of the parameters:
   ```
-  mcmc -y 37386.yaml
+  tg_mcmc -y 37386.yaml
   ```
 
 - The updated TLEs can be ingested through: 
   ```
-  ingest -c 37386.txt
+  tg_ingest -c 37386.txt
   ```
 ## License
 &copy; 2019-2021 Cees Bassa
