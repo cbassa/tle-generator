@@ -29,6 +29,8 @@ pip install -e .[mcmc]
 
 ## Example usage
 
+![flow diagram](docs/tle-generator-flow-v3.drawio.png "Analysis Pipeline flow diagram")
+
 - Ingest new observations and/or orbital elements into the database:
   ```
   ingest -c elements/37386.txt -d observations/37386.dat
